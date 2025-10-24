@@ -9,6 +9,6 @@ streamlit-folium
 altair
 python-dotenv
 pyproj
-fpdf2
-kaleido     
+fpdf2  
 Pillow
+
