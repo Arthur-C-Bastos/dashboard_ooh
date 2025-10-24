@@ -2,12 +2,12 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import io # Necessário para io.BytesIO
+import io
 from src.utils import set_page_config_and_style
 from datetime import datetime
 
 # -------------------------------
-# CONFIGURAÇÕES GERAIS E ESTILO PADRÃO
+# CONFIGURAÇÕES GERAIS E DADOS (Omitido por brevidade, sem alterações)
 # -------------------------------
 set_page_config_and_style(
     page_title="Relatório Executivo",
@@ -15,12 +15,8 @@ set_page_config_and_style(
     subtitle="Resumo das análises e opções de exportação de dados"
 )
 
-# -------------------------------
-# DADOS MOCK (Simulando os dados de outras abas)
-# -------------------------------
 @st.cache_data
 def get_mock_data():
-    """Gera um DataFrame unificado para download, simulando dados de análise OOH."""
     data = {
         'ID_Campanha': [f'C{i}' for i in range(101, 111)],
         'Mes': ['Jan', 'Jan', 'Fev', 'Fev', 'Mar', 'Mar', 'Abr', 'Abr', 'Maio', 'Maio'],
@@ -31,47 +27,31 @@ def get_mock_data():
         'CPM_R$': np.random.uniform(2.5, 6.0, 10).round(2),
         'Audiencia_Pico_K': np.random.randint(50, 200, 10)
     }
-    df = pd.DataFrame(data)
-    return df
+    return pd.DataFrame(data)
 
 df_relatorio = get_mock_data()
-
-# Cálculos Aggregados (necessários no escopo principal para o placeholder)
 total_investimento = df_relatorio['Investimento_Mil_R$'].sum()
 media_cpm = df_relatorio['CPM_R$'].mean()
 total_reach = df_relatorio['Reach_Milhoes'].sum().round(1)
 num_campanhas = len(df_relatorio)
 
-# -------------------------------
-# 1. RESUMO EXECUTIVO NA TELA
-# -------------------------------
-st.markdown("### Resumo das Métricas Chave")
+# ... (Seção 1 e 2 omitidas)
 
+st.markdown("### Resumo das Métricas Chave")
 col1, col2, col3, col4 = st.columns(4)
-with col1:
-    st.metric("Total de Campanhas", num_campanhas)
-with col2:
-    st.metric("Investimento Total (Mil R$)", f"{total_investimento:,.0f}".replace(",", "."))
-with col3:
-    st.metric("Reach Agregado (Milhões)", f"{total_reach:,.1f}".replace(",", "."))
-with col4:
-    st.metric("CPM Médio", f"R$ {media_cpm:.2f}")
+with col1: st.metric("Total de Campanhas", num_campanhas)
+with col2: st.metric("Investimento Total (Mil R$)", f"{total_investimento:,.0f}".replace(",", "."))
+with col3: st.metric("Reach Agregado (Milhões)", f"{total_reach:,.1f}".replace(",", "."))
+with col4: st.metric("CPM Médio", f"R$ {media_cpm:.2f}")
 
 st.markdown("---")
 
-# Detalhe dos dados (opcional, para visualização rápida)
 if st.checkbox("Mostrar Tabela de Dados (Detalhamento)"):
     st.dataframe(df_relatorio.head(), use_container_width=True, hide_index=True)
 
-
-# -------------------------------
-# 2. DOWNLOAD CSV
-# -------------------------------
 st.markdown("### 📥 Download em CSV")
 st.info("Baixe a planilha completa de desempenho das campanhas para análise detalhada em Excel ou outra ferramenta.")
-
 csv = df_relatorio.to_csv(index=False).encode('utf-8')
-
 st.download_button(
     label="Baixar Dados em CSV",
     data=csv,
@@ -89,6 +69,7 @@ st.markdown("### 📄 Download em PDF (Relatório Visual)")
 def create_pdf_report(df: pd.DataFrame) -> bytes:
     """
     Função que gera um relatório PDF usando fpdf2, se instalado.
+    Garante que o retorno seja sempre bytes para o download_button.
     """
     try:
         from fpdf import FPDF 
@@ -102,23 +83,19 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
         pdf.cell(200, 10, f"Data da Geração: {datetime.now().strftime('%Y-%m-%d %H:%M')}", 0, 1) 
         pdf.cell(200, 10, f"Total de Campanhas Analisadas: {len(df)}", 0, 1)
 
-        # Adicionar Métrica Principal
         pdf.set_font("Arial", "B", 14)
         pdf.cell(200, 10, f"Investimento Agregado: R$ {df['Investimento_Mil_R$'].sum():,.0f} mil", 0, 1)
         
-        # Adicionar Tabela Simplificada
         pdf.set_font("Arial", "B", 10)
         col_widths = [30, 30, 30, 30, 30]
         headers = ["Campanha", "Mês", "Investimento", "Reach (MM)", "CPM (R$)"]
         
-        # Header
         for col, width in zip(headers, col_widths):
             pdf.cell(width, 7, col, 1, 0, "C")
         pdf.ln()
 
-        # Data rows (Top 5 para o PDF)
         pdf.set_font("Arial", "", 10)
-        for index, row in df.head(5).iterrows():
+        for _, row in df.head(5).iterrows():
             pdf.cell(col_widths[0], 7, row['ID_Campanha'], 1, 0)
             pdf.cell(col_widths[1], 7, row['Mes'], 1, 0)
             pdf.cell(col_widths[2], 7, f"R$ {row['Investimento_Mil_R$']:.0f}K", 1, 0)
@@ -126,11 +103,11 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
             pdf.cell(col_widths[4], 7, f"R$ {row['CPM_R$']:.2f}", 1, 0)
             pdf.ln()
 
-        # CORREÇÃO FINAL: Retorna o objeto binário puro
+        # RETORNO BINÁRIO PURO (PDF gerado)
         return pdf.output(dest='S')
         
     except ImportError:
-        # Placeholder binário
+        # PLACEHOLDER: Retorno binário forçado para o placeholder
         st.warning("A biblioteca `fpdf2` não está instalada. O PDF gerado será um placeholder de texto.")
         
         pdf_content_str = f"RELATÓRIO EXECUTIVO OOH (Placeholder) \n\nTotal de Campanhas: {len(df)}\nInvestimento: R$ {df['Investimento_Mil_R$'].sum():,.0f} mil\n\nInstale 'fpdf2' (pip install fpdf2) para gerar o PDF completo."
@@ -138,13 +115,15 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
         buffer = io.BytesIO()
         buffer.write(pdf_content_str.encode('utf-8'))
         
-        return buffer.getvalue() # Retorna o conteúdo binário do buffer
+        return buffer.getvalue() 
 
     except Exception as e:
-        # Captura outros erros
+        # TRATAMENTO DE OUTROS ERROS: Retorna bytes com a mensagem de erro
         st.error(f"Erro ao gerar PDF (Instalado?): {e}")
-        pdf_content = f"RELATÓRIO EXECUTIVO OOH (Erro na Geração) \n\nDetalhes: {e}"
-        return pdf_content.encode('utf-8')
+        pdf_content_str = f"RELATÓRIO EXECUTIVO OOH (Erro na Geração) \n\nDetalhes: {e}"
+        
+        # Converte a string de erro para bytes antes de retornar
+        return pdf_content_str.encode('utf-8') 
 
 # -------------------------------
 # Botão de Download PDF
