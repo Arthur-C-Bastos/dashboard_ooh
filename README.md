@@ -34,37 +34,6 @@ Este projeto foi construído sobre uma arquitetura moderna, com foco em performa
 | **Data/APIs** | **Pandas** / **Requests** | ETL, manipulação de dados e consumo da **Overpass API** (OpenStreetMap) para POIs. |
 | **Geocoding** | **Geopy** (Nominatim) | Conversão de nomes de bairros/endereços em coordenadas de Lat/Lon. |
 
----
-
-### ⚙️ Como Executar Localmente
-
-Siga os passos abaixo para rodar a aplicação em sua máquina:
-
-1.  **Clone o Repositório:**
-    ```bash
-    git clone [link suspeito removido]
-    cd dashboard_ooh
-    ```
-
-2.  **Crie e Ative o Ambiente Virtual:**
-    ```bash
-    python -m venv venv
-    source venv/bin/activate  # Linux/Mac
-    # venv\Scripts\activate    # Windows
-    ```
-
-3.  **Instale as Dependências:**
-    *(É crucial ter todas as bibliotecas de geoprocessamento (`geopandas`, `shapely`, `geopy`) instaladas corretamente.)*
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-4.  **Inicie a Aplicação Streamlit:**
-    ```bash
-    streamlit run app.py
-    ```
-
-O Dashboard será aberto automaticamente em seu navegador (geralmente em `http://localhost:8501`).
 
 ---
 
