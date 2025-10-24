@@ -1,179 +1,174 @@
-# pages/6_Melhores_Pontos.py
 import streamlit as st
 import pandas as pd
-import folium
-from streamlit_folium import st_folium
-import plotly.graph_objects as go
-from src.fetchers import fetch_pois_overpass
 import numpy as np
+import plotly.express as px
+from src.utils import set_page_config_and_style # Importa a função de padronização
 
 # -------------------------------
-# CONFIGURAÇÕES
+# CONFIGURAÇÕES GERAIS E ESTILO PADRÃO
 # -------------------------------
-st.set_page_config(page_title="Melhores Pontos OOH", layout="wide")
-st.header("MELHORES PONTOS – RANKING DE POTENCIAL (SÓ ÔNIBUS)")
-st.markdown("**Top 20 pontos de ônibus com maior alcance populacional – sem linhas**")
-
-MAX_TOP = 20
-RAIO_PADRAO = 150  # metros
-
-# -------------------------------
-# DADOS DE TODAS AS REGIÕES
-# -------------------------------
-REGIOES_DATA = {
-    "Toda São Paulo": {"pop": 12_399_294, "area_km2": 1521, "bbox": "-23.8,-46.9,-23.3,-46.3"},
-    "Zona Sul": {"pop": 2_800_000, "area_km2": 240, "bbox": "-23.75,-46.75,-23.60,-46.60"},
-    "Centro": {"pop": 1_200_000, "area_km2": 50, "bbox": "-23.57,-46.68,-23.52,-46.62"},
-    "Zona Norte": {"pop": 2_500_000, "area_km2": 220, "bbox": "-23.45,-46.70,-23.35,-46.55"},
-    "Zona Leste": {"pop": 3_200_000, "area_km2": 280, "bbox": "-23.65,-46.55,-23.45,-46.35"},
-    "Zona Oeste": {"pop": 2_000_000, "area_km2": 180, "bbox": "-23.65,-46.80,-23.45,-46.65"},
-    "Santo André": {"pop": 748_000, "area_km2": 175, "bbox": "-23.72,-46.58,-23.62,-46.48"},
-    "São Bernardo do Campo": {"pop": 849_000, "area_km2": 409, "bbox": "-23.80,-46.62,-23.65,-46.50"},
-    "Osasco": {"pop": 728_000, "area_km2": 65, "bbox": "-23.58,-46.82,-23.50,-46.75"},
-    "Cotia": {"pop": 270_000, "area_km2": 324, "bbox": "-23.68,-46.90,-23.55,-46.80"}
-}
+set_page_config_and_style(
+    page_title="Melhores Pontos OOH",
+    main_title="CLASSIFICAÇÃO DOS MELHORES PONTOS OOH",
+    subtitle="Análise Geográfica de Ativos e Ranking por Desempenho (Score)"
+)
 
 # -------------------------------
-# BUSCAR APENAS PONTOS DE ÔNIBUS
+# FUNÇÃO SIMULADA DE GERAÇÃO DE DADOS
 # -------------------------------
-@st.cache_data(ttl=7200, show_spinner=False)
-def buscar_pontos_onibus(regiao, bbox):
-    df = fetch_pois_overpass(bbox, tags=["highway=bus_stop"], timeout=30)
-
-    if not df.empty:
-        if 'public_transport' in df.columns:
-            df = df[~df['public_transport'].isin(['platform', 'stop_position'])]
-        if 'route' in df.columns:
-            df = df[df['route'].isna()]
-        if 'highway' in df.columns:
-            df = df[df['highway'] == 'bus_stop']
-        df = df[df['lat'].notna() & df['lon'].notna()]
-
-    # Fallback
-    if df.empty or len(df) == 0:
-        np.random.seed(42)
-        n = 80
-        lat = np.random.uniform(float(bbox.split(',')[0]), float(bbox.split(',')[2]), n)
-        lon = np.random.uniform(float(bbox.split(',')[1]), float(bbox.split(',')[3]), n)
-        df = pd.DataFrame({
-            'lat': lat, 'lon': lon,
-            'name': [f"Ponto Ônibus {i}" for i in range(n)],
-            'addr:street': [f"Rua {i%10}" for i in range(n)],
-            'highway': ['bus_stop'] * n
-        })
-
-    df['regiao'] = regiao
+@st.cache_data(ttl=3600)
+def generate_ooh_points():
+    """Gera dados simulados de pontos OOH (Out-of-Home) em São Paulo."""
+    
+    # Coordenadas aproximadas de pontos centrais e estratégicos de SP
+    data = {
+        'ID_Ponto': [f'OOH-{i:03}' for i in range(1, 26)],
+        'Latitude': [
+            -23.5505, -23.5430, -23.5614, -23.5520, -23.5630, # Centro/Paulista
+            -23.5850, -23.6000, -23.5780, -23.5700, -23.5480, # Zona Oeste/Sul
+            -23.5200, -23.5000, -23.4800, -23.4700, -23.4500, # Zona Norte
+            -23.6500, -23.6300, -23.6100, -23.5900, -23.5300, # Zona Sul/Marginal
+            -23.5400, -23.5350, -23.5450, -23.5550, -23.5650, # Outros
+        ],
+        'Longitude': [
+            -46.6333, -46.6500, -46.6667, -46.6833, -46.6200,
+            -46.6900, -46.6700, -46.6550, -46.6450, -46.6350,
+            -46.6100, -46.5900, -46.5700, -46.5500, -46.5300,
+            -46.6000, -46.5800, -46.5600, -46.5400, -46.6400,
+            -46.6700, -46.6800, -46.6600, -46.6550, -46.6450,
+        ],
+        'Audiência Diária (Milhares)': np.random.randint(20, 150, 25),
+        'Custo Mensal (R$ Mil)': np.random.uniform(5.0, 50.0, 25).round(1),
+        'Tipo': ['Digital', 'Estático'] * 12 + ['Digital'],
+        'Zona': ['Centro', 'Oeste', 'Sul', 'Norte', 'Leste'] * 5
+    }
+    df = pd.DataFrame(data)
+    
+    # --- Cálculo do Score (Métrica principal para ranking) ---
+    # Score é Audiência * (1 / Custo) * Fator de Impacto
+    df['Custo por Audiência (R$/mil)'] = (df['Custo Mensal (R$ Mil)'] * 1000) / df['Audiência Diária (Milhares)']
+    df['Fator de Impacto'] = np.random.uniform(0.8, 1.2, 25).round(2)
+    
+    # Exemplo simples de Score: quanto maior, melhor
+    df['Score OOH'] = (df['Audiência Diária (Milhares)'] / df['Custo por Audiência (R$/mil)']) * df['Fator de Impacto']
+    df['Score OOH'] = df['Score OOH'].rank(ascending=False).astype(int)
+    
     return df
 
-# -------------------------------
-# ANÁLISE COMPLETA
-# -------------------------------
-if st.button("Analisar Todos os Pontos de Ônibus", type="primary"):
-    with st.spinner("Buscando pontos de ônibus em todas as regiões..."):
-        todos_pontos = []
-        for regiao, dados in REGIOES_DATA.items():
-            df_regiao = buscar_pontos_onibus(regiao, dados["bbox"])
-            area_ponto = 3.14159 * (RAIO_PADRAO / 1000) ** 2
-            densidade = dados["pop"] / dados["area_km2"]
-            pop_coberta = int(area_ponto * densidade)
-            df_regiao['pop_coberta'] = pop_coberta
-            df_regiao['potencial'] = pop_coberta
-            todos_pontos.append(df_regiao.head(100))
+df_pontos = generate_ooh_points()
 
-        df_completo = pd.concat(todos_pontos, ignore_index=True)
-        df_top = df_completo.nlargest(MAX_TOP, 'potencial').reset_index(drop=True)
+# -------------------------------
+# CONTROLES E FILTROS
+# -------------------------------
+st.markdown("### Seleção e Filtros de Pontos")
+col_tipo, col_zona, col_custo = st.columns(3)
 
-        # LIMPEZA DOS DADOS
-        df_top['name'] = df_top['name'].fillna("Ponto sem nome").astype(str)
-        df_top['addr:street'] = df_top['addr:street'].fillna("").astype(str)
-        df_top['nome_completo'] = df_top.apply(
-            lambda x: f"{x['name']}" if x['addr:street'] in ["", "nan"] else f"{x['name']}, {x['addr:street']}",
-            axis=1
+with col_tipo:
+    tipos_selecionados = st.multiselect("Filtrar por Tipo de Mídia", df_pontos['Tipo'].unique(), default=df_pontos['Tipo'].unique())
+
+with col_zona:
+    zonas_selecionadas = st.multiselect("Filtrar por Zona", df_pontos['Zona'].unique(), default=df_pontos['Zona'].unique())
+
+with col_custo:
+    custo_max = st.slider("Custo Mensal Máximo (R$ Mil)", 
+                          min_value=5.0, 
+                          max_value=df_pontos['Custo Mensal (R$ Mil)'].max().round() + 5, 
+                          value=df_pontos['Custo Mensal (R$ Mil)'].max().round(), 
+                          step=1.0)
+
+# Aplicar Filtros
+df_filtrado = df_pontos[
+    (df_pontos['Tipo'].isin(tipos_selecionados)) &
+    (df_pontos['Zona'].isin(zonas_selecionadas)) &
+    (df_pontos['Custo Mensal (R$ Mil)'] <= custo_max)
+].copy()
+
+# Ordenar por Score para o ranking
+df_ranking = df_filtrado.sort_values(by='Score OOH', ascending=True)
+
+# -------------------------------
+# 1. MAPA (Esquerda) e RANKING (Direita)
+# -------------------------------
+st.markdown("---")
+col_mapa, col_ranking = st.columns([2, 1])
+
+if not df_filtrado.empty:
+    
+    # --- 1.1 MAPA INTERATIVO (PLANO DE FUNDO) ---
+    with col_mapa:
+        st.markdown("##### Visualização Geográfica dos Ativos")
+        # O mapa de dispersão do Plotly é melhor para visualização interativa do que st.map
+        fig_mapa = px.scatter_mapbox(
+            df_filtrado,
+            lat="Latitude",
+            lon="Longitude",
+            color="Score OOH", 
+            size="Audiência Diária (Milhares)",
+            color_continuous_scale=px.colors.cyclical.IceFire,
+            zoom=10, 
+            height=600,
+            mapbox_style="carto-positron", # Estilo claro e profissional
+            hover_data={
+                'ID_Ponto': True,
+                'Audiência Diária (Milhares)': ':.1f',
+                'Custo Mensal (R$ Mil)': ':.1f',
+                'Score OOH': True,
+                'Latitude': False,
+                'Longitude': False,
+            }
         )
+        # Centralizar no ponto médio (São Paulo)
+        fig_mapa.update_layout(
+            mapbox_center={"lat": -23.5505, "lon": -46.6333},
+            margin={"r":0,"t":0,"l":0,"b":0}
+        )
+        st.plotly_chart(fig_mapa, use_container_width=True)
+
+
+    # --- 1.2 RANKING DE PONTOS (TABELA) ---
+    with col_ranking:
+        st.markdown(f"##### Ranking (Top {min(5, len(df_ranking))})")
         
-        st.session_state.df_top = df_top
-        st.session_state.df_completo = df_completo
-
-    st.success(f"Top {MAX_TOP} pontos de ônibus carregados!")
-
-# -------------------------------
-# EXIBIÇÃO
-# -------------------------------
-if 'df_top' in st.session_state:
-    df_top = st.session_state.df_top
-
-    col1, col2 = st.columns([1, 2])
-
-    with col1:
-        st.subheader("Ranking de Potencial (Ônibus)")
-        df_display = df_top.copy()
-        df_display['pop_coberta'] = df_display['pop_coberta'].apply(lambda x: f"{x:,}".replace(",", "."))
-        df_display = df_display[['regiao', 'nome_completo', 'pop_coberta']].head(10)
-        df_display.columns = ['Região', 'Ponto', 'Pop. Coberta']
-        st.dataframe(df_display, use_container_width=True)
-
-    with col2:
-        st.subheader("Gráfico de Potencial")
-        top10 = df_top.head(10)
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=top10['nome_completo'],
-            y=top10['pop_coberta'],
-            text=top10['pop_coberta'].apply(lambda x: f"{x:,}".replace(",", ".")),
-            textposition='outside',
-            marker_color='lightblue',
-            hovertemplate="<b>%{x}</b><br>População Coberta: %{y:,}<extra></extra>"
-        ))
-        fig.update_layout(
-            title="Top 10 Pontos de Ônibus por População Coberta",
-            xaxis_title="Ponto",
-            yaxis_title="População Coberta",
-            xaxis_tickangle=-30,
-            template="simple_white",
-            height=500
+        # Métrica de ponto de melhor performance (Top 1)
+        top_ponto = df_ranking.iloc[-1]
+        st.info(f"""
+            **Melhor Ponto:** {top_ponto['ID_Ponto']} ({top_ponto['Zona']})  
+            **Score:** {top_ponto['Score OOH']}  
+            **Audiência:** {top_ponto['Audiência Diária (Milhares)']} mil/dia
+        """)
+        
+        # Tabela de Ranking
+        df_ranking_display = df_ranking.tail(5)[['ID_Ponto', 'Score OOH', 'Audiência Diária (Milhares)', 'Custo Mensal (R$ Mil)']].copy()
+        
+        df_ranking_display.rename(columns={
+            'Audiência Diária (Milhares)': 'Audiência (mil)',
+            'Custo Mensal (R$ Mil)': 'Custo (R$ mil)'
+        }, inplace=True)
+        
+        st.dataframe(
+            df_ranking_display.sort_values(by='Score OOH', ascending=False),
+            use_container_width=True, 
+            hide_index=True
         )
-        st.plotly_chart(fig, use_container_width=True)
 
     # -------------------------------
-    # MAPA DOS MELHORES PONTOS
+    # 2. MÉTRICAS CONSOLIDADAS
     # -------------------------------
-    st.subheader("Mapa dos Melhores Pontos de Ônibus")
-    centro_sp = [-23.55, -46.63]
-    m = folium.Map(location=centro_sp, zoom_start=10, tiles="CartoDB positron")
+    st.markdown("---")
+    st.markdown("### Métricas de Performance do Portfólio Selecionado")
+    
+    total_audiencia = df_filtrado['Audiência Diária (Milhares)'].sum()
+    total_custo = df_filtrado['Custo Mensal (R$ Mil)'].sum()
+    
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        st.metric("Total de Ativos", len(df_filtrado))
+    with col_b:
+        st.metric("Audiência Diária Total", f"{total_audiencia:,.0f} mil".replace(",", "."))
+    with col_c:
+        st.metric("Custo Mensal Agregado", f"R$ {total_custo:,.0f} mil".replace(",", "."))
+        
+    st.caption("Score OOH é uma métrica interna calculada para otimização de custo e audiência. Quanto menor o Score, maior a prioridade de revisão do ponto.")
 
-    for idx, row in df_top.iterrows():
-        lat, lon = row['lat'], row['lon']
-        nome = row['nome_completo']
-        pop = int(row['pop_coberta'])
-        regiao = row['regiao']
-
-        texto = f"<b>{nome}</b><br><b>Pop: {pop:,}</b><br><i>{regiao}</i>".replace(",", ".")
-        cor = "gold" if idx < 3 else "orange" if idx < 10 else "blue"
-
-        folium.CircleMarker(
-            [lat, lon],
-            radius=10,
-            color=cor,
-            fill=True,
-            fill_opacity=0.8,
-            popup=folium.Popup(texto, max_width=300)
-        ).add_to(m)
-
-        folium.Marker(
-            [lat, lon],
-            icon=folium.Icon(color="white", icon="bus", prefix='fa'),
-            popup=folium.Popup(texto, max_width=300)
-        ).add_to(m)
-
-    st_folium(m, width=900, height=500)
-
-    # Exportar
-    csv = df_top[['regiao', 'nome_completo', 'pop_coberta', 'lat', 'lon']].to_csv(index=False).encode('utf-8')
-    st.download_button(
-        "Baixar Top 20 (CSV)",
-        csv,
-        "melhores_pontos_onibus.csv",
-        "text/csv"
-    )
 else:
-    st.info("Clique em **Analisar Todos os Pontos de Ônibus** para gerar o ranking.")
+    st.warning("Nenhum ponto OOH encontrado com os filtros selecionados. Ajuste os critérios.")
