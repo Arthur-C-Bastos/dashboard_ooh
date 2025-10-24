@@ -2,9 +2,9 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import io
+import io # Necessário para io.BytesIO
 from src.utils import set_page_config_and_style
-from datetime import datetime # Importa a classe datetime
+from datetime import datetime
 
 # -------------------------------
 # CONFIGURAÇÕES GERAIS E ESTILO PADRÃO
@@ -36,16 +36,16 @@ def get_mock_data():
 
 df_relatorio = get_mock_data()
 
-# -------------------------------
-# 1. RESUMO EXECUTIVO NA TELA
-# -------------------------------
-st.markdown("### Resumo das Métricas Chave")
-
-# Cálculos Aggregados
+# Cálculos Aggregados (necessários no escopo principal para o placeholder)
 total_investimento = df_relatorio['Investimento_Mil_R$'].sum()
 media_cpm = df_relatorio['CPM_R$'].mean()
 total_reach = df_relatorio['Reach_Milhoes'].sum().round(1)
 num_campanhas = len(df_relatorio)
+
+# -------------------------------
+# 1. RESUMO EXECUTIVO NA TELA
+# -------------------------------
+st.markdown("### Resumo das Métricas Chave")
 
 col1, col2, col3, col4 = st.columns(4)
 with col1:
@@ -95,12 +95,7 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
 
         pdf = FPDF()
         pdf.add_page()
-        
-        # NOTE: Para acentos e caracteres especiais, você pode precisar de uma fonte TrueType:
-        # pdf.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
-        # pdf.set_font("DejaVu", "", 16)
         pdf.set_font("Arial", "B", 16) 
-        
         pdf.cell(200, 10, "Relatório Executivo OOH", 0, 1, "C")
         
         pdf.set_font("Arial", "", 12)
@@ -131,15 +126,20 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
             pdf.cell(col_widths[4], 7, f"R$ {row['CPM_R$']:.2f}", 1, 0)
             pdf.ln()
 
-        # CORREÇÃO AQUI: Removemos o .encode(), pois pdf.output(dest='S') já retorna bytes/bytearray
+        # CORREÇÃO FINAL: Retorna o objeto binário puro
         return pdf.output(dest='S')
         
     except ImportError:
-        # Se a importação falhar, ele cai aqui, gerando o placeholder de texto com segurança.
-        
+        # Placeholder binário
         st.warning("A biblioteca `fpdf2` não está instalada. O PDF gerado será um placeholder de texto.")
-        pdf_content = f"RELATÓRIO EXECUTIVO OOH (Placeholder) \n\nTotal de Campanhas: {len(df)}\nInvestimento: R$ {df['Investimento_Mil_R$'].sum():,.0f} mil\n\nInstale 'fpdf2' (pip install fpdf2) para gerar o PDF completo."
-        return pdf_content.encode('utf-8')
+        
+        pdf_content_str = f"RELATÓRIO EXECUTIVO OOH (Placeholder) \n\nTotal de Campanhas: {len(df)}\nInvestimento: R$ {df['Investimento_Mil_R$'].sum():,.0f} mil\n\nInstale 'fpdf2' (pip install fpdf2) para gerar o PDF completo."
+        
+        buffer = io.BytesIO()
+        buffer.write(pdf_content_str.encode('utf-8'))
+        
+        return buffer.getvalue() # Retorna o conteúdo binário do buffer
+
     except Exception as e:
         # Captura outros erros
         st.error(f"Erro ao gerar PDF (Instalado?): {e}")
