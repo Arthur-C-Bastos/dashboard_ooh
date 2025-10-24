@@ -1,9 +1,14 @@
-# pages/3_Mobilidade.py
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import requests
-from src.utils import set_page_config_and_style # IMPORTAÇÃO DO NOVO MÓDULO
+from src.utils import set_page_config_and_style # Importa a função de padronização
+
+# -------------------------------
+# DEFINIÇÃO DO TOKEN (INPUT REMOVIDO)
+# -------------------------------
+# Definido como None para usar o fallback de estimativa, já que o input foi removido.
+SPTRANS_TOKEN = None 
 
 # -------------------------------
 # CONFIGURAÇÕES GERAIS E ESTILO PADRÃO
@@ -15,25 +20,8 @@ set_page_config_and_style(
 )
 
 # -------------------------------
-# TOKEN SPTRANS (input seguro)
-# -------------------------------
-# Usando um container para isolar o input na parte superior da coluna
-with st.container():
-    st.markdown("##### Configuração da API")
-    SPTRANS_TOKEN = st.text_input(
-        "Token SPTrans (Olho Vivo)",
-        value="",
-        type="password",
-        help="Cadastre em: https://sptrans.com.br/desenvolvedores/olhovivo/"
-    )
-
-if not SPTRANS_TOKEN.strip():
-    SPTRANS_TOKEN = None
-
-# -------------------------------
 # Controles de Seleção
 # -------------------------------
-# Usando colunas para organizar os seletores horizontalmente
 col_hora, col_dia = st.columns(2)
 
 with col_hora:
@@ -47,14 +35,14 @@ with col_dia:
 # -------------------------------
 # Botão
 # -------------------------------
-# Separando o botão com uma linha horizontal para clareza
 st.markdown("---")
 if st.button("Buscar dados de mobilidade", type="primary"):
-    with st.spinner("Consultando SPTrans e calculando fluxo..."):
+    with st.spinner("Calculando fluxo e estimativas..."):
 
-        # --- 1. Ônibus em operação (SPTrans) ---
+        # --- 1. Ônibus em operação (Lógica ajustada para token = None) ---
         if SPTRANS_TOKEN:
             try:
+                # Esta parte só é executada se o token for fornecido via 'st.secrets' ou outra fonte
                 from src.fetchers import SPTransClient
                 client = SPTransClient(SPTRANS_TOKEN)
                 if client.authenticate():
@@ -65,10 +53,11 @@ if st.button("Buscar dados de mobilidade", type="primary"):
                     num_onibus = 680
                     onibus_fonte = "Estimativa (API Indisponível)"
             except Exception as e:
-                st.warning(f"Erro SPTrans: Falha na autenticação ou busca. Detalhes: {e}")
+                #st.warning(f"Erro SPTrans: Falha na autenticação ou busca. Detalhes: {e}")
                 num_onibus = 680
                 onibus_fonte = "Estimativa (Erro na API)"
         else:
+            # Caso o token seja None (nossa nova configuração)
             num_onibus = 680
             onibus_fonte = "Estimativa (Token Ausente)"
 
