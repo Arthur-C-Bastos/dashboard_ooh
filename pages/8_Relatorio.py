@@ -6,7 +6,7 @@ import io
 from src.utils import set_page_config_and_style
 from datetime import datetime
 import plotly.express as px
-from PIL import Image # Importado para manipulação, caso necessário, mas principalmente para clareza
+from PIL import Image # Mantido para clareza, mas sem uso direto de kaleido
 
 # -------------------------------
 # CONFIGURAÇÕES GERAIS E ESTILO PADRÃO
@@ -42,10 +42,13 @@ total_reach = df_relatorio['Reach_Milhoes'].sum().round(1)
 num_campanhas = len(df_relatorio)
 
 # -------------------------------
-# FUNÇÃO: GERA GRÁFICO PARA EXPORTAÇÃO
+# FUNÇÃO: GERA GRÁFICO PARA EXPORTAÇÃO (Tratamento de Kaleido implícito)
 # -------------------------------
 def generate_chart_png(df):
-    """Cria um gráfico Plotly e o retorna como bytes PNG."""
+    """
+    Cria um gráfico Plotly e tenta retorná-lo como bytes PNG.
+    Se a exportação (que depende de Kaleido/navegador) falhar, retorna None.
+    """
     df_agg = df.groupby('Mes')['Investimento_Mil_R$'].sum().reset_index()
     mes_order = ['Jan', 'Fev', 'Mar', 'Abr', 'Maio']
     df_agg['Mes'] = pd.Categorical(df_agg['Mes'], categories=mes_order, ordered=True)
@@ -62,14 +65,12 @@ def generate_chart_png(df):
     fig.update_layout(plot_bgcolor='white', margin=dict(t=50, b=0, l=0, r=0))
     
     try:
-        # TENTA EXPORTAR DIRETAMENTE COMO BYTES PNG
-        # Requer 'kaleido' para a renderização limpa
+        # AQUI O PLOTLY TENTA USAR O KALEIDO/NAVEGADOR PARA EXPORTAR
         img_bytes = fig.to_image(format="png", width=700, height=400)
-        
         return img_bytes
         
     except Exception as e:
-        # Se Plotly/Kaleido falhar (por falta de navegador ou outra razão)
+        # Se falhar (o caso "retire o kaleido"), o código cai aqui.
         st.error(f"Erro ao gerar imagem PNG do gráfico: {e}")
         return None
 
@@ -201,7 +202,7 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
         # PLACEHOLDER: fpdf2 não instalado
         st.warning("A biblioteca `fpdf2` não está instalada. O PDF gerado será um placeholder de texto.")
         
-        pdf_content_str = f"RELATÓRIO EXECUTIVO OOH (Placeholder) \n\nInstale 'fpdf2' e 'kaleido' para o relatório visual rico."
+        pdf_content_str = f"RELATÓRIO EXECUTIVO OOH (Placeholder) \n\nInstale 'fpdf2' para o relatório. O gráfico requer 'kaleido'."
         buffer = io.BytesIO()
         buffer.write(pdf_content_str.encode('utf-8'))
         return buffer.getvalue() 
@@ -223,5 +224,5 @@ st.download_button(
     file_name='relatorio_executivo_ooh_rico.pdf',
     mime='application/pdf',
     type="primary",
-    help="Gera um relatório PDF com métricas, gráfico de investimento e tabela."
+    help="Gera um relatório PDF com métricas, gráfico de investimento e tabela. O gráfico pode falhar se o Kaleido/navegador não estiver disponível."
 )
