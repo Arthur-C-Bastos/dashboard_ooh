@@ -105,7 +105,7 @@ st.markdown("### 📄 Download em PDF (Relatório com Storytelling)")
 def create_pdf_report(df: pd.DataFrame) -> bytes:
     """
     Função que gera um relatório PDF focado em storytelling e detalhamento textual, 
-    incluindo uma projeção futura.
+    incluindo projeção futura e detalhe por mídia.
     """
     try:
         # 1. PRÉ-CÁLCULOS E ANÁLISE DOS MELHORES PONTOS
@@ -114,17 +114,25 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
         df_monthly = df.groupby('Mes').agg(
             Total_Investimento=('Investimento_Mil_R$', 'sum'),
             Media_CPM=('CPM_R$', 'mean'),
-            Total_Reach=('Reach_Milhoes', 'sum')
+            Total_Reach=('Reach_Milhoes', 'sum'),
+            Media_Frequencia=('Frequencia', 'mean') # Adicionado Média de Frequência
         ).reset_index()
-        
-        # Agregação por Mídia para Projeção
+        df_monthly['Media_Frequencia'] = df_monthly['Media_Frequencia'].round(1)
+
+        # Agregação por Mídia para Projeção e Detalhe
         df_media = df.groupby('Tipo_Midia').agg(
             Media_CPM=('CPM_R$', 'mean'),
             Total_Reach=('Reach_Milhoes', 'sum'),
-            Total_Investimento=('Investimento_Mil_R$', 'sum')
+            Total_Investimento=('Investimento_Mil_R$', 'sum'),
+            Media_Frequencia=('Frequencia', 'mean') # Adicionado Média de Frequência
         ).reset_index()
+        df_media['Media_Frequencia'] = df_media['Media_Frequencia'].round(1)
+        df_media['Media_CPM'] = df_media['Media_CPM'].round(2)
+        df_media['Total_Reach'] = df_media['Total_Reach'].round(1)
+        df_media['Total_Investimento'] = df_media['Total_Investimento'].round(0)
 
-        # Encontrar o Melhor Ponto de Eficiência (menor CPM)
+
+        # ENCONTRAR MÉTRICAS CHAVE PARA STORYTELLING E PROJEÇÃO
         melhor_midia = df_media.loc[df_media['Media_CPM'].idxmin()]
         cpm_base = melhor_midia['Media_CPM']
         
@@ -133,9 +141,8 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
         novo_investimento = melhor_midia['Total_Investimento'] * (1 + aumento_investimento)
         
         # Novo Reach Projetado (mantendo a eficiência do CPM base)
-        # Reach = Custo / CPM (Milhares)
         novo_reach_proj_milhoes = (novo_investimento * 1000) / cpm_base / 1000
-        novo_reach_proj_milhoes = novo_reach_proj_milhoes.round(1) 
+        novo_reach_proj_milhoes = novo_reach_proj_milhoes.round(1)
         
         
         # Dados do Sumário
@@ -162,11 +169,8 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
         pdf.set_font("Arial", "", 12)
         pdf.multi_cell(0, 6, 
             f"O período de análise demonstrou um investimento total de "
-            f"R$ {total_investimento_geral:,.0f} mil. O foco principal esteve no mês de "
-            f"'{maior_investimento_mes['Mes']}', que concentrou o maior volume de recursos "
-            f"({maior_investimento_mes['Total_Investimento']:,.0f} mil R$). "
-            f"A estratégia alcançou um total de {df.loc[:, 'Reach_Milhoes'].sum():,.1f} milhões de pessoas "
-            f"com um custo médio por milhão (CPM) de R$ {df.loc[:, 'CPM_R$'].mean():.2f}."
+            f"R$ {total_investimento_geral:,.0f} mil, alcançando um total de {df.loc[:, 'Reach_Milhoes'].sum():,.1f} milhões de pessoas. "
+            f"O custo médio por milhão (CPM) ficou em R$ {df.loc[:, 'CPM_R$'].mean():.2f}, com uma frequência média de exposição de {df.loc[:, 'Frequencia'].mean():.1f} vezes."
         )
         pdf.ln(5)
 
@@ -178,16 +182,17 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
             invest = row['Total_Investimento']
             reach = row['Total_Reach']
             cpm = row['Media_CPM']
+            freq = row['Media_Frequencia']
             
             pdf.set_font("Arial", "B", 11)
             pdf.write(5, f"Mês de {row['Mes']}:", link='')
             
             pdf.set_font("Arial", "", 11)
             
-            story_part = f" O investimento atingiu R$ {invest:,.0f} mil, resultando em um alcance de {reach:,.1f} milhões. O CPM médio foi de R$ {cpm:.2f}."
+            story_part = f" O investimento atingiu R$ {invest:,.0f} mil, gerando {reach:,.1f} milhões de alcance e frequência média de {freq:.1f}. O CPM médio foi de R$ {cpm:.2f}."
             
             if row['Mes'] == maior_investimento_mes['Mes']:
-                 story_part += " (Pico de investimento da campanha.)"
+                 story_part += " (Pico de investimento.)"
             elif cpm > df_monthly['Media_CPM'].mean() * 1.1:
                  story_part += " (CPM ligeiramente acima da média.)"
             
@@ -195,40 +200,75 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
             pdf.ln(5) 
 
         pdf.ln(5)
-        
+
         # ------------------------------------------------------------------
-        # --- SEÇÃO 3: PROJEÇÃO ESTRATÉGICA ---
+        # --- SEÇÃO 3: ANÁLISE CONSOLIDADA POR MÍDIA (NOVA TABELA) ---
         # ------------------------------------------------------------------
         pdf.set_font("Arial", "B", 14)
-        pdf.cell(200, 10, "3. Projeção Estratégica: Otimizando o Investimento", 0, 1, "L")
+        pdf.cell(200, 10, "3. Performance Consolidada por Tipo de Mídia", 0, 1, "L")
+        
+        pdf.set_font("Arial", "B", 10)
+        col_widths_media = [40, 40, 40, 40, 30]
+        headers_media = ["Mídia", "Investimento (R$K)", "Reach (Milhões)", "CPM Médio (R$)", "Freq. Média"]
+        
+        # Header da Tabela
+        for col, width in zip(headers_media, col_widths_media):
+            pdf.cell(width, 7, col, 1, 0, "C")
+        pdf.ln()
+
+        # Linhas de Dados
+        pdf.set_font("Arial", "", 10)
+        for _, row in df_media.iterrows():
+            pdf.cell(col_widths_media[0], 7, row['Tipo_Midia'], 1, 0)
+            
+            pdf.cell(col_widths_media[1], 7, f"R$ {row['Total_Investimento']:,.0f}", 1, 0, "R")
+            pdf.cell(col_widths_media[2], 7, f"{row['Total_Reach']:.1f}", 1, 0, "R")
+            
+            # Destaque para o melhor CPM
+            if row['Media_CPM'] == melhor_midia['Media_CPM']:
+                pdf.set_font("Arial", "B", 10)
+            pdf.cell(col_widths_media[3], 7, f"R$ {row['Media_CPM']:.2f}", 1, 0, "R")
+            pdf.set_font("Arial", "", 10) 
+            
+            pdf.cell(col_widths_media[4], 7, f"{row['Media_Frequencia']:.1f}", 1, 0, "R")
+            pdf.ln()
+        
+        pdf.ln(5)
+        
+        # --- SEÇÃO 4: PROJEÇÃO ESTRATÉGICA (Agora é a Seção 4) ---
+        pdf.set_font("Arial", "B", 14)
+        pdf.cell(200, 10, "4. Projeção Estratégica: Otimizando o Investimento", 0, 1, "L")
         
         pdf.set_font("Arial", "", 12)
         pdf.multi_cell(0, 6, 
-            f"Baseado na performance histórica, a mídia **{melhor_midia['Tipo_Midia']}** se destacou com o melhor custo-benefício, apresentando um CPM médio de "
-            f"R$ {cpm_base:.2f}. Recomendamos focar recursos nesta categoria."
+            f"Baseado na análise de eficiência, a mídia **{melhor_midia['Tipo_Midia']}** se destacou com o melhor custo-benefício (CPM de R$ {cpm_base:.2f}). "
+            f"A projeção abaixo demonstra o resultado esperado ao realocar {aumento_investimento*100:.0f}% de investimento adicional mantendo a mesma eficiência."
         )
         pdf.ln(3)
 
         pdf.set_font("Arial", "B", 12)
-        pdf.cell(0, 6, f"Cenário Projetado: Aumento de {aumento_investimento*100:.0f}% no Investimento na Mídia {melhor_midia['Tipo_Midia']}", 0, 1, "L")
+        pdf.cell(0, 6, f"Cenário Projetado: Aumento de {aumento_investimento*100:.0f}% (Investimento focado em {melhor_midia['Tipo_Midia']})", 0, 1, "L")
         pdf.ln(1)
         
         pdf.set_font("Arial", "", 11)
         pdf.multi_cell(0, 6,
-            f"- **Investimento Base:** R$ {melhor_midia['Total_Investimento']:,.0f} mil \n"
+            f"- **Investimento Base em {melhor_midia['Tipo_Midia']}:** R$ {melhor_midia['Total_Investimento']:,.0f} mil \n"
             f"- **Novo Investimento Projetado:** R$ {novo_investimento:,.0f} mil \n"
-            f"- **Alcance Projetado:** {novo_reach_proj_milhoes:,.1f} milhões (aumento de "
-            f"{novo_reach_proj_milhoes - melhor_midia['Total_Reach']:,.1f} milhões em relação ao histórico desta mídia)."
+            f"- **Alcance Projetado:** {novo_reach_proj_milhoes:,.1f} milhões (Aumento de Reach de {novo_reach_proj_milhoes - melhor_midia['Total_Reach']:,.1f} milhões)."
         )
         pdf.ln(5)
+
+        # Adiciona quebra de página se não houver espaço suficiente para a próxima seção
+        if pdf.get_y() > 250:
+             pdf.add_page()
         
-        # --- SEÇÃO 4: TABELA AGREGADA (Mensal) ---
+        # --- SEÇÃO 5: TABELA AGREGADA (Mensal) (Agora é a Seção 5) ---
         pdf.set_font("Arial", "B", 14)
-        pdf.cell(200, 10, "4. Tabela de Performance Consolidada (Mensal)", 0, 1, "L")
+        pdf.cell(200, 10, "5. Tabela de Performance Consolidada (Mensal)", 0, 1, "L")
 
         pdf.set_font("Arial", "B", 10)
-        col_widths = [40, 40, 40, 40]
-        headers = ["Mês", "Investimento (R$K)", "Reach (Milhões)", "CPM Médio (R$)"]
+        col_widths = [35, 35, 35, 35, 35]
+        headers = ["Mês", "Investimento (R$K)", "Reach (Milhões)", "CPM Médio (R$)", "Freq. Média"] # Adicionado Frequência
         
         for col, width in zip(headers, col_widths):
             pdf.cell(width, 7, col, 1, 0, "C")
@@ -249,16 +289,21 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
                 pdf.set_text_color(255, 0, 0) 
             pdf.cell(col_widths[3], 7, f"R$ {row['Media_CPM']:.2f}", 1, 0, "R")
             pdf.set_text_color(0, 0, 0) 
+            
+            pdf.cell(col_widths[4], 7, f"{row['Media_Frequencia']:.1f}", 1, 0, "R") # Exibindo Frequência
             pdf.ln()
 
         pdf.ln(10)
+
+        # Adiciona quebra de página antes da última seção (para garantir a 2ª folha)
+        pdf.add_page()
         
-        # --- SEÇÃO 5: DETALHE COMPLETO DA CAMPANHA ---
+        # --- SEÇÃO 6: DETALHE COMPLETO DA CAMPANHA (Agora é a Seção 6) ---
         pdf.set_font("Arial", "B", 14)
-        pdf.cell(200, 10, "5. Detalhe Completo por Campanha", 0, 1, "L")
+        pdf.cell(200, 10, "6. Detalhe Completo por Campanha (Top 5 em Investimento)", 0, 1, "L")
         
         pdf.set_font("Arial", "I", 10)
-        pdf.cell(200, 5, "Listamos as 5 campanhas com maior investimento no período.", 0, 1, "L")
+        pdf.cell(200, 5, "Detalhe das 5 campanhas com maior investimento no período.", 0, 1, "L")
         pdf.ln(2)
 
         pdf.set_font("Arial", "B", 8)
@@ -313,5 +358,5 @@ st.download_button(
     file_name='relatorio_executivo_storytelling.pdf',
     mime='application/pdf',
     type="primary",
-    help="Gera um relatório PDF detalhado com narrativa de dados e projeções estratégicas."
+    help="Gera um relatório PDF detalhado com narrativa de dados, detalhe por mídia e projeções estratégicas."
 )
