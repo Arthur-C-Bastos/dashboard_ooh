@@ -5,6 +5,7 @@ import numpy as np
 import io
 from src.utils import set_page_config_and_style
 from datetime import datetime
+import plotly.express as px # Adicionado para criar o gráfico
 
 # -------------------------------
 # CONFIGURAÇÕES GERAIS E DADOS (Omitido por brevidade, sem alterações)
@@ -37,8 +38,41 @@ media_cpm = df_relatorio['CPM_R$'].mean()
 total_reach = df_relatorio['Reach_Milhoes'].sum().round(1)
 num_campanhas = len(df_relatorio)
 
-# ... (Seções de Resumo e Download CSV mantidas)
+# -------------------------------
+# FUNÇÃO: GERA GRÁFICO PARA EXPORTAÇÃO
+# -------------------------------
+def generate_chart_png(df):
+    """Cria um gráfico Plotly e o retorna como bytes PNG."""
+    df_agg = df.groupby('Mes')['Investimento_Mil_R$'].sum().reset_index()
+    # Ordem dos meses para o gráfico
+    mes_order = ['Jan', 'Fev', 'Mar', 'Abr', 'Maio']
+    df_agg['Mes'] = pd.Categorical(df_agg['Mes'], categories=mes_order, ordered=True)
+    df_agg = df_agg.sort_values('Mes')
+    
+    fig = px.bar(
+        df_agg, 
+        x='Mes', 
+        y='Investimento_Mil_R$', 
+        title='Investimento Agregado por Mês (R$ Mil)',
+        labels={'Investimento_Mil_R$': 'Investimento (R$ Mil)'},
+        color_discrete_sequence=['#1E90FF']
+    )
+    fig.update_layout(plot_bgcolor='white', margin=dict(t=50, b=0, l=0, r=0))
+    
+    img_bytes = io.BytesIO()
+    
+    try:
+        # Requer 'kaleido' para exportar
+        fig.write_image(img_bytes, format='png', width=700, height=400)
+        return img_bytes.getvalue()
+    except Exception as e:
+        # Retorna None ou uma imagem de placeholder se kaleido falhar
+        st.error(f"Erro ao exportar gráfico para PNG (Verifique a instalação de 'kaleido'): {e}")
+        return None
 
+# -------------------------------
+# 1. RESUMO EXECUTIVO NA TELA (MANTIDO)
+# -------------------------------
 st.markdown("### Resumo das Métricas Chave")
 col1, col2, col3, col4 = st.columns(4)
 with col1: st.metric("Total de Campanhas", num_campanhas)
@@ -48,11 +82,28 @@ with col4: st.metric("CPM Médio", f"R$ {media_cpm:.2f}")
 
 st.markdown("---")
 
-if st.checkbox("Mostrar Tabela de Dados (Detalhamento)"):
-    st.dataframe(df_relatorio.head(), use_container_width=True, hide_index=True)
+# Visualização do gráfico no dashboard (para debug e visualização)
+st.markdown("### 📊 Visualização Gráfica do Relatório")
+if st.checkbox("Mostrar Gráfico de Investimento (Visão Dashboard)"):
+    df_agg = df_relatorio.groupby('Mes')['Investimento_Mil_R$'].sum().reset_index()
+    mes_order = ['Jan', 'Fev', 'Mar', 'Abr', 'Maio']
+    df_agg['Mes'] = pd.Categorical(df_agg['Mes'], categories=mes_order, ordered=True)
+    df_agg = df_agg.sort_values('Mes')
+    fig_dash = px.bar(
+        df_agg, 
+        x='Mes', 
+        y='Investimento_Mil_R$', 
+        title='Investimento Agregado por Mês (R$ Mil)',
+        color_discrete_sequence=['#1E90FF']
+    )
+    st.plotly_chart(fig_dash, use_container_width=True)
 
+# -------------------------------
+# 2. DOWNLOAD CSV (MANTIDO)
+# -------------------------------
+st.markdown("---")
 st.markdown("### 📥 Download em CSV")
-st.info("Baixe a planilha completa de desempenho das campanhas para análise detalhada em Excel ou outra ferramenta.")
+# ... (código download CSV)
 csv = df_relatorio.to_csv(index=False).encode('utf-8')
 st.download_button(
     label="Baixar Dados em CSV",
@@ -64,80 +115,111 @@ st.download_button(
 
 
 # -------------------------------
-# 3. DOWNLOAD PDF (Função simulada)
+# 3. DOWNLOAD PDF (Função RICA)
 # -------------------------------
-st.markdown("### 📄 Download em PDF (Relatório Visual)")
+st.markdown("### 📄 Download em PDF (Relatório Visual Rico)")
 
 def create_pdf_report(df: pd.DataFrame) -> bytes:
     """
-    Função que gera um relatório PDF. Usa io.BytesIO para garantir retorno binário.
+    Função que gera um relatório PDF rico com imagem.
     """
     try:
         from fpdf import FPDF 
-
+        
+        # 1. GERA O GRÁFICO COMO IMAGEM BINÁRIA
+        chart_png_bytes = generate_chart_png(df)
+        
         pdf = FPDF()
         pdf.add_page()
+        
+        # --- CABEÇALHO ---
         pdf.set_font("Arial", "B", 16) 
         pdf.cell(200, 10, "Relatório Executivo OOH", 0, 1, "C")
-        
         pdf.set_font("Arial", "", 12)
         pdf.cell(200, 10, f"Data da Geração: {datetime.now().strftime('%Y-%m-%d %H:%M')}", 0, 1) 
-        pdf.cell(200, 10, f"Total de Campanhas Analisadas: {len(df)}", 0, 1)
+        pdf.ln(5)
 
+        # --- SEÇÃO 1: MÉTRICAS CHAVE ---
         pdf.set_font("Arial", "B", 14)
-        pdf.cell(200, 10, f"Investimento Agregado: R$ {df['Investimento_Mil_R$'].sum():,.0f} mil", 0, 1)
+        pdf.cell(200, 10, "Métricas Consolidadas", 0, 1, "L")
+        pdf.set_font("Arial", "", 12)
+        pdf.cell(50, 7, "Total Campanhas:", 0, 0)
+        pdf.cell(50, 7, str(len(df)), 0, 1)
+        pdf.cell(50, 7, "Investimento Total:", 0, 0)
+        pdf.cell(50, 7, f"R$ {df['Investimento_Mil_R$'].sum():,.0f} mil", 0, 1)
+        pdf.cell(50, 7, "Reach Agregado:", 0, 0)
+        pdf.cell(50, 7, f"{df['Reach_Milhoes'].sum():,.1f} milhões", 0, 1)
+        pdf.ln(5)
         
+        # --- SEÇÃO 2: GRÁFICO DE INVESTIMENTO ---
+        if chart_png_bytes:
+            pdf.set_font("Arial", "B", 14)
+            pdf.cell(200, 10, "Visualização de Investimento Mensal", 0, 1, "L")
+            
+            # Adiciona a imagem do buffer
+            # 'type' precisa ser 'png' ou 'jpeg'
+            pdf.image(
+                name=io.BytesIO(chart_png_bytes), 
+                type='PNG', 
+                w=pdf.w - 20 # Largura total da página menos margens
+            )
+            pdf.ln(10)
+        else:
+            pdf.set_font("Arial", "I", 10)
+            pdf.cell(200, 5, "Gráfico não disponível (Kaleido não instalado/erro de exportação)", 0, 1, "C")
+            pdf.ln(5)
+
+
+        # --- SEÇÃO 3: DETALHE DA TABELA (Top 5) ---
+        pdf.set_font("Arial", "B", 14)
+        pdf.cell(200, 10, "Detalhe das Campanhas (Top 5)", 0, 1, "L")
+
         pdf.set_font("Arial", "B", 10)
-        col_widths = [30, 30, 30, 30, 30]
-        headers = ["Campanha", "Mês", "Investimento", "Reach (MM)", "CPM (R$)"]
+        col_widths = [30, 20, 35, 30, 30, 30]
+        headers = ["Campanha", "Mês", "Investimento(K)", "Reach (MM)", "Frequência", "CPM (R$)"]
         
         for col, width in zip(headers, col_widths):
             pdf.cell(width, 7, col, 1, 0, "C")
         pdf.ln()
 
-        pdf.set_font("Arial", "", 10)
+        pdf.set_font("Arial", "", 8) # Fonte menor para tabela
         for _, row in df.head(5).iterrows():
             pdf.cell(col_widths[0], 7, row['ID_Campanha'], 1, 0)
             pdf.cell(col_widths[1], 7, row['Mes'], 1, 0)
-            pdf.cell(col_widths[2], 7, f"R$ {row['Investimento_Mil_R$']:.0f}K", 1, 0)
-            pdf.cell(col_widths[3], 7, f"{row['Reach_Milhoes']:.1f}", 1, 0)
-            pdf.cell(col_widths[4], 7, f"R$ {row['CPM_R$']:.2f}", 1, 0)
+            pdf.cell(col_widths[2], 7, f"R$ {row['Investimento_Mil_R$']:.1f}", 1, 0, "R")
+            pdf.cell(col_widths[3], 7, f"{row['Reach_Milhoes']:.1f}", 1, 0, "R")
+            pdf.cell(col_widths[4], 7, f"{row['Frequencia']:.1f}", 1, 0, "R")
+            pdf.cell(col_widths[5], 7, f"R$ {row['CPM_R$']:.2f}", 1, 0, "R")
             pdf.ln()
 
-        # ALTERAÇÃO CHAVE: Usar io.BytesIO para garantir a tipagem 'bytes'
-        pdf_output = pdf.output(dest='S')
-        buffer = io.BytesIO(pdf_output)
-        
+        # RETORNO BINÁRIO (garantido)
+        buffer = io.BytesIO(pdf.output(dest='S'))
         return buffer.getvalue() 
         
     except ImportError:
-        # PLACEHOLDER: Retorno binário forçado para o placeholder
+        # PLACEHOLDER: fpdf2 não instalado
         st.warning("A biblioteca `fpdf2` não está instalada. O PDF gerado será um placeholder de texto.")
-        
-        pdf_content_str = f"RELATÓRIO EXECUTIVO OOH (Placeholder) \n\nTotal de Campanhas: {len(df)}\nInvestimento: R$ {df['Investimento_Mil_R$'].sum():,.0f} mil\n\nInstale 'fpdf2' (pip install fpdf2) para gerar o PDF completo."
-        
+        pdf_content_str = f"RELATÓRIO EXECUTIVO OOH (Placeholder) \n\nInstale 'fpdf2' e 'kaleido' para o relatório visual rico."
         buffer = io.BytesIO()
         buffer.write(pdf_content_str.encode('utf-8'))
-        
         return buffer.getvalue() 
 
     except Exception as e:
-        # TRATAMENTO DE OUTROS ERROS: Retorna bytes com a mensagem de erro
+        # TRATAMENTO DE OUTROS ERROS
         st.error(f"Erro ao gerar PDF: {type(e).__name__}: {e}")
-        pdf_content_str = f"RELATÓRIO EXECUTIVO OOH (Erro na Geração) \n\nDetalhes: {type(e).__name__}: {e}"
-        
-        # Converte a string de erro para bytes antes de retornar
+        pdf_content_str = f"RELATÓRIO EXECUTIVO OOH (Erro Crítico) \n\nDetalhes: {type(e).__name__}: {e}"
         return pdf_content_str.encode('utf-8') 
 
 # -------------------------------
-# Botão de Download PDF
+# Botão de Download PDF (MANTIDO)
 # -------------------------------
 pdf_bytes = create_pdf_report(df_relatorio)
 
 st.download_button(
     label="Baixar Relatório em PDF",
     data=pdf_bytes,
-    file_name='relatorio_executivo_ooh.pdf',
+    file_name='relatorio_executivo_ooh_rico.pdf',
     mime='application/pdf',
-    help="Gera um relatório PDF com as principais métricas e uma tabela resumida."
+    type="primary",
+    help="Gera um relatório PDF com métricas, gráfico de investimento e tabela."
 )
