@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 
 st.set_page_config(
     page_title="OOH Dashboard BR",
@@ -34,3 +35,4 @@ df_nav = pd.DataFrame(data)
 
 st.markdown("---")
 st.header("Selecione uma aba no menu lateral para começar sua análise.")
+
