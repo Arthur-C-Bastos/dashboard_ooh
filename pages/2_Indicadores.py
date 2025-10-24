@@ -3,6 +3,23 @@ import streamlit as st
 import pandas as pd
 from src.fetchers import fetch_population_ibge
 
+from src.utils import set_page_config_and_style # IMPORTAÇÃO DO NOVO MÓDULO
+
+# -------------------------------
+# Configurações
+# -------------------------------
+MUNIC_NOME = "São Paulo"
+# ... outras variáveis
+
+# CHAME A FUNÇÃO PADRÃO
+set_page_config_and_style(
+    page_title="Indicadores SP",
+    main_title=f"INDICADORES COMPLETOS – {MUNIC_NOME}",
+    subtitle="População • PIB • IDH • Tráfego • Evolução 2020–2026"
+)
+
+# O restante do seu código continua aqui
+
 MUNIC_CODE = "3550308"
 MUNIC_NOME = "São Paulo"
 POP_2023_OFICIAL = 12_325_232  # IBGE 2023
