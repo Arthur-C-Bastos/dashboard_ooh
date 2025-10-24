@@ -5,21 +5,98 @@ import numpy as np
 import io
 from src.utils import set_page_config_and_style
 from datetime import datetime
-# Plotly não é mais necessário para a função de PDF, mas mantido para visualização no dashboard
+# Plotly e PIL não são mais estritamente necessários, mas são mantidos para evitar NameError
+# se eles forem usados em outros lugares não mostrados.
 import plotly.express as px 
-# Pillow também não é mais estritamente necessário, mas mantido.
 from PIL import Image 
 
-# ... (Restante do setup e mock data) ...
+# -------------------------------
+# CONFIGURAÇÕES GERAIS E ESTILO PADRÃO
+# -------------------------------
+set_page_config_and_style(
+    page_title="Relatório Executivo",
+    main_title="RELATÓRIO EXECUTIVO & DOWNLOAD",
+    subtitle="Resumo das análises e opções de exportação de dados"
+)
 
 # -------------------------------
-# FUNÇÃO: GERA GRÁFICO PARA EXPORTAÇÃO (SIMPLIFICADA)
+# DADOS MOCK (Simulando os dados de outras abas)
+# -------------------------------
+@st.cache_data
+def get_mock_data():
+    """Gera um DataFrame unificado para download, simulando dados de análise OOH."""
+    data = {
+        'ID_Campanha': [f'C{i}' for i in range(101, 111)],
+        'Mes': ['Jan', 'Jan', 'Fev', 'Fev', 'Mar', 'Mar', 'Abr', 'Abr', 'Maio', 'Maio'],
+        'Tipo_Midia': ['Digital', 'Estática'] * 5,
+        'Investimento_Mil_R$': np.random.uniform(50, 300, 10).round(1),
+        'Reach_Milhoes': np.random.uniform(1.0, 5.0, 10).round(2),
+        'Frequencia': np.random.uniform(4.0, 7.0, 10).round(1),
+        'CPM_R$': np.random.uniform(2.5, 6.0, 10).round(2),
+        'Audiencia_Pico_K': np.random.randint(50, 200, 10)
+    }
+    return pd.DataFrame(data)
+
+# >>>>>>>>>>>>>>>>>> DEFINIÇÃO DAS VARIÁVEIS AQUI <<<<<<<<<<<<<<<<<<<<
+# Garante que df_relatorio e as métricas estejam no escopo principal
+df_relatorio = get_mock_data()
+total_investimento = df_relatorio['Investimento_Mil_R$'].sum()
+media_cpm = df_relatorio['CPM_R$'].mean()
+total_reach = df_relatorio['Reach_Milhoes'].sum().round(1)
+num_campanhas = len(df_relatorio)
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+# -------------------------------
+# FUNÇÃO: GERA GRÁFICO PARA EXPORTAÇÃO (Vazio, conforme solicitado)
 # -------------------------------
 def generate_chart_png(df):
-    # Se optamos por não ter imagens, esta função retorna None
+    """Retorna None, desativando a inclusão de imagens no PDF."""
     return None
 
-# ... (Seções de Resumo e Download CSV mantidas) ...
+# -------------------------------
+# 1. RESUMO EXECUTIVO NA TELA
+# -------------------------------
+st.markdown("### Resumo das Métricas Chave")
+col1, col2, col3, col4 = st.columns(4)
+with col1: st.metric("Total de Campanhas", num_campanhas)
+with col2: st.metric("Investimento Total (Mil R$)", f"{total_investimento:,.0f}".replace(",", "."))
+with col3: st.metric("Reach Agregado (Milhões)", f"{total_reach:,.1f}".replace(",", "."))
+with col4: st.metric("CPM Médio", f"R$ {media_cpm:.2f}")
+
+st.markdown("---")
+
+# Visualização do gráfico no dashboard (opcional, requer Plotly)
+if st.checkbox("Mostrar Gráfico de Investimento (Visão Dashboard)"):
+    try:
+        df_agg = df_relatorio.groupby('Mes')['Investimento_Mil_R$'].sum().reset_index()
+        mes_order = ['Jan', 'Fev', 'Mar', 'Abr', 'Maio']
+        df_agg['Mes'] = pd.Categorical(df_agg['Mes'], categories=mes_order, ordered=True)
+        df_agg = df_agg.sort_values('Mes')
+        fig_dash = px.bar(
+            df_agg, 
+            x='Mes', 
+            y='Investimento_Mil_R$', 
+            title='Investimento Agregado por Mês (R$ Mil)',
+            color_discrete_sequence=['#1E90FF']
+        )
+        st.plotly_chart(fig_dash, use_container_width=True)
+    except NameError:
+        st.error("Erro: Plotly não encontrado para gerar o gráfico no dashboard.")
+
+# -------------------------------
+# 2. DOWNLOAD CSV
+# -------------------------------
+st.markdown("### 📥 Download em CSV")
+st.info("Baixe a planilha completa de desempenho das campanhas para análise detalhada em Excel ou outra ferramenta.")
+csv = df_relatorio.to_csv(index=False).encode('utf-8')
+st.download_button(
+    label="Baixar Dados em CSV",
+    data=csv,
+    file_name='relatorio_ooh_detalhado.csv',
+    mime='text/csv',
+    type="primary"
+)
+
 
 # -------------------------------
 # 3. DOWNLOAD PDF (Função Storytelling)
@@ -89,25 +166,22 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
             reach = row['Total_Reach']
             cpm = row['Media_CPM']
             
-            # Formatação do texto com destaque em negrito
+            # Formatação do texto com destaque em negrito (simulando, pois FPDF é limitado)
             story = (
-                f"**Mês de {row['Mes']}:** O investimento atingiu R$ {invest:,.0f} mil, "
+                f"Mês de {row['Mes']}: O investimento atingiu R$ {invest:,.0f} mil, "
                 f"resultando em um alcance de {reach:,.1f} milhões. O CPM médio foi de R$ {cpm:.2f}."
             )
             
-            # Destaque para o mês de pico ou baixo desempenho (simulação)
             if row['Mes'] == maior_investimento_mes['Mes']:
                  story += " (Este mês representou o pico de investimento da campanha.)"
             elif cpm > df_monthly['Media_CPM'].mean() * 1.1:
                  story += " (Observa-se um CPM ligeiramente acima da média.)"
             
-            pdf.write(5, story.replace('**', FPDF.set_font_style), link='') # Usar write para quebras de linha
-
-            # Formatação manual de negrito (FPDF não suporta Markdown)
+            # Formatação manual de negrito na primeira parte
             pdf.set_font("Arial", "B", 11)
             pdf.write(5, f"Mês de {row['Mes']}:", link='')
             pdf.set_font("Arial", "", 11)
-            pdf.write(5, story.replace(f"**Mês de {row['Mes']}:**", ''), link='')
+            pdf.write(5, story.replace(f"Mês de {row['Mes']}:", ''), link='')
             pdf.ln(5)
 
         pdf.ln(5)
@@ -151,9 +225,8 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
         pdf.set_font("Arial", "B", 14)
         pdf.cell(200, 10, "4. Detalhe Completo por Campanha", 0, 1, "L")
         
-        # Aqui você pode incluir a tabela completa da campanha, se necessário.
         pdf.set_font("Arial", "I", 10)
-        pdf.cell(200, 5, "Para brevidade no relatório, listamos apenas as 5 principais campanhas.", 0, 1, "L")
+        pdf.cell(200, 5, "Listamos as 5 campanhas com maior investimento no período.", 0, 1, "L")
         pdf.ln(2)
 
         pdf.set_font("Arial", "B", 8)
@@ -165,7 +238,10 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
         pdf.ln()
 
         pdf.set_font("Arial", "", 7)
-        for _, row in df.head(5).iterrows():
+        # Ordena por investimento e pega os 5 maiores para o detalhe
+        df_detail = df.sort_values(by='Investimento_Mil_R$', ascending=False).head(5)
+        
+        for _, row in df_detail.iterrows():
             pdf.cell(col_widths_detalhe[0], 5, row['ID_Campanha'], 1, 0)
             pdf.cell(col_widths_detalhe[1], 5, row['Mes'], 1, 0, "C")
             pdf.cell(col_widths_detalhe[2], 5, row['Tipo_Midia'], 1, 0)
@@ -207,5 +283,4 @@ st.download_button(
     file_name='relatorio_executivo_storytelling.pdf',
     mime='application/pdf',
     type="primary",
-    help="Gera um relatório PDF detalhado com narrativa de dados e formatação condicional."
-)
+    help="Gera um relatório PDF detalhado com narrativa
