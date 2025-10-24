@@ -1,10 +1,8 @@
 streamlit
 pandas
+plotly
 geopandas
-requests
-shapely
 folium
 streamlit-folium
-altair
-python-dotenv
-pyproj
+requests
+shapely
