@@ -11,4 +11,5 @@ python-dotenv
 pyproj
 fpdf2  
 Pillow
+geopy
 
