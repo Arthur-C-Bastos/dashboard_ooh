@@ -7,9 +7,10 @@ from src.utils import set_page_config_and_style
 from datetime import datetime
 import plotly.express as px 
 from PIL import Image 
+from fpdf import FPDF # Importado aqui para evitar NameError dentro da função
 
 # -------------------------------
-# CONFIGURAÇÕES GERAIS E DADOS (Sem alterações)
+# CONFIGURAÇÕES GERAIS E ESTILO PADRÃO
 # -------------------------------
 set_page_config_and_style(
     page_title="Relatório Executivo",
@@ -17,6 +18,9 @@ set_page_config_and_style(
     subtitle="Resumo das análises e opções de exportação de dados"
 )
 
+# -------------------------------
+# DADOS MOCK E CÁLCULOS
+# -------------------------------
 @st.cache_data
 def get_mock_data():
     """Gera um DataFrame unificado para download, simulando dados de análise OOH."""
@@ -32,6 +36,7 @@ def get_mock_data():
     }
     return pd.DataFrame(data)
 
+# Variáveis Globais
 df_relatorio = get_mock_data()
 total_investimento = df_relatorio['Investimento_Mil_R$'].sum()
 media_cpm = df_relatorio['CPM_R$'].mean()
@@ -42,7 +47,46 @@ def generate_chart_png(df):
     """Retorna None, desativando a inclusão de imagens no PDF."""
     return None
 
-# ... (Seções de Resumo e Download CSV mantidas) ...
+# -------------------------------
+# 1. RESUMO EXECUTIVO NA TELA
+# -------------------------------
+st.markdown("### Resumo das Métricas Chave")
+col1, col2, col3, col4 = st.columns(4)
+with col1: st.metric("Total de Campanhas", num_campanhas)
+with col2: st.metric("Investimento Total (Mil R$)", f"{total_investimento:,.0f}".replace(",", "."))
+with col3: st.metric("Reach Agregado (Milhões)", f"{total_reach:,.1f}".replace(",", "."))
+with col4: st.metric("CPM Médio", f"R$ {media_cpm:.2f}")
+
+st.markdown("---")
+
+# Visualização do gráfico no dashboard (opcional)
+if st.checkbox("Mostrar Gráfico de Investimento (Visão Dashboard)"):
+    df_agg = df_relatorio.groupby('Mes')['Investimento_Mil_R$'].sum().reset_index()
+    mes_order = ['Jan', 'Fev', 'Mar', 'Abr', 'Maio']
+    df_agg['Mes'] = pd.Categorical(df_agg['Mes'], categories=mes_order, ordered=True)
+    df_agg = df_agg.sort_values('Mes')
+    fig_dash = px.bar(
+        df_agg, 
+        x='Mes', 
+        y='Investimento_Mil_R$', 
+        title='Investimento Agregado por Mês (R$ Mil)',
+        color_discrete_sequence=['#1E90FF']
+    )
+    st.plotly_chart(fig_dash, use_container_width=True)
+
+# -------------------------------
+# 2. DOWNLOAD CSV
+# -------------------------------
+st.markdown("### 📥 Download em CSV")
+csv = df_relatorio.to_csv(index=False).encode('utf-8')
+st.download_button(
+    label="Baixar Dados em CSV",
+    data=csv,
+    file_name='relatorio_ooh_detalhado.csv',
+    mime='text/csv',
+    type="primary"
+)
+
 
 # -------------------------------
 # 3. DOWNLOAD PDF (Função Storytelling)
@@ -54,8 +98,6 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
     Função que gera um relatório PDF focado em storytelling e detalhamento textual.
     """
     try:
-        from fpdf import FPDF 
-        
         # 1. PRÉ-CÁLCULOS E NARRATIVA
         df_monthly = df.groupby('Mes').agg(
             Total_Investimento=('Investimento_Mil_R$', 'sum'),
@@ -88,14 +130,13 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
         pdf.cell(200, 10, "1. Análise Sumária da Performance", 0, 1, "L")
         
         pdf.set_font("Arial", "", 12)
-        # Usando multi_cell para o bloco de texto principal
         pdf.multi_cell(0, 6, 
             f"O período de análise demonstrou um investimento total de "
             f"R$ {total_investimento:,.0f} mil. O foco principal esteve no mês de "
             f"'{maior_investimento_mes['Mes']}', que concentrou o maior volume de recursos "
             f"({maior_investimento_mes['Total_Investimento']:,.0f} mil R$). "
-            f"A estratégia alcançou um total de {df_relatorio['Reach_Milhoes'].sum():,.1f} milhões de pessoas "
-            f"com um custo médio por milhão (CPM) de R$ {df_relatorio['CPM_R$'].mean():.2f}."
+            f"A estratégia alcançou um total de {df.loc[:, 'Reach_Milhoes'].sum():,.1f} milhões de pessoas "
+            f"com um custo médio por milhão (CPM) de R$ {df.loc[:, 'CPM_R$'].mean():.2f}."
         )
         pdf.ln(5)
 
@@ -109,24 +150,22 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
             reach = row['Total_Reach']
             cpm = row['Media_CPM']
             
-            # Parte 1: Negrito
+            # Parte 1: Negrito - Mes
             pdf.set_font("Arial", "B", 11)
             pdf.write(5, f"Mês de {row['Mes']}:", link='')
             
-            # Parte 2: Texto normal
+            # Parte 2: Texto normal - Detalhes
             pdf.set_font("Arial", "", 11)
-            story_part = (
-                f" O investimento atingiu R$ {invest:,.0f} mil, "
-                f"resultando em um alcance de {reach:,.1f} milhões. O CPM médio foi de R$ {cpm:.2f}."
-            )
+            
+            story_part = f" O investimento atingiu R$ {invest:,.0f} mil, resultando em um alcance de {reach:,.1f} milhões. O CPM médio foi de R$ {cpm:.2f}."
             
             if row['Mes'] == maior_investimento_mes['Mes']:
-                 story_part += " (Este mês representou o pico de investimento da campanha.)"
+                 story_part += " (Pico de investimento da campanha.)"
             elif cpm > df_monthly['Media_CPM'].mean() * 1.1:
                  story_part += " (Observa-se um CPM ligeiramente acima da média.)"
             
             pdf.write(5, story_part, link='')
-            pdf.ln(5) # Quebra de linha após o parágrafo mensal
+            pdf.ln(5) 
 
         pdf.ln(5)
 
@@ -151,77 +190,4 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
             # Estilo Condicional para Investimento Alto
             if row['Total_Investimento'] == maior_investimento_mes['Total_Investimento']:
                 pdf.set_font("Arial", "B", 10)
-            pdf.cell(col_widths[1], 7, f"R$ {row['Total_Investimento']:,.0f}", 1, 0, "R")
-            pdf.set_font("Arial", "", 10) # Reseta o negrito
-
-            pdf.cell(col_widths[2], 7, f"{row['Total_Reach']:.1f}", 1, 0, "R")
-            
-            # Estilo Condicional para CPM Alto
-            if row['Media_CPM'] > df_monthly['Media_CPM'].mean() * 1.1:
-                pdf.set_text_color(255, 0, 0) # Cor Vermelha
-            pdf.cell(col_widths[3], 7, f"R$ {row['Media_CPM']:.2f}", 1, 0, "R")
-            pdf.set_text_color(0, 0, 0) # Reseta a cor para preto
-            pdf.ln()
-
-        pdf.ln(10)
-        
-        # --- SEÇÃO 4: DETALHE COMPLETO DA CAMPANHA ---
-        pdf.set_font("Arial", "B", 14)
-        pdf.cell(200, 10, "4. Detalhe Completo por Campanha", 0, 1, "L")
-        
-        pdf.set_font("Arial", "I", 10)
-        pdf.cell(200, 5, "Listamos as 5 campanhas com maior investimento no período.", 0, 1, "L")
-        pdf.ln(2)
-
-        pdf.set_font("Arial", "B", 8)
-        col_widths_detalhe = [20, 15, 20, 20, 20, 20, 20, 20]
-        headers_detalhe = ["ID", "Mês", "Mídia", "Invest.(K)", "Reach(MM)", "Freq.", "CPM", "Audiência"]
-        
-        for col, width in zip(headers_detalhe, col_widths_detalhe):
-            pdf.cell(width, 7, col, 1, 0, "C")
-        pdf.ln()
-
-        pdf.set_font("Arial", "", 7)
-        df_detail = df.sort_values(by='Investimento_Mil_R$', ascending=False).head(5)
-        
-        for _, row in df_detail.iterrows():
-            pdf.cell(col_widths_detalhe[0], 5, row['ID_Campanha'], 1, 0)
-            pdf.cell(col_widths_detalhe[1], 5, row['Mes'], 1, 0, "C")
-            pdf.cell(col_widths_detalhe[2], 5, row['Tipo_Midia'], 1, 0)
-            pdf.cell(col_widths_detalhe[3], 5, f"{row['Investimento_Mil_R$']:.1f}", 1, 0, "R")
-            pdf.cell(col_widths_detalhe[4], 5, f"{row['Reach_Milhoes']:.1f}", 1, 0, "R")
-            pdf.cell(col_widths_detalhe[5], 5, f"{row['Frequencia']:.1f}", 1, 0, "R")
-            pdf.cell(col_widths_detalhe[6], 5, f"{row['CPM_R$']:.2f}", 1, 0, "R")
-            pdf.cell(col_widths_detalhe[7], 5, f"{row['Audiencia_Pico_K']}", 1, 0, "R")
-            pdf.ln()
-
-
-        # RETORNO BINÁRIO
-        buffer = io.BytesIO(pdf.output(dest='S'))
-        return buffer.getvalue() 
-        
-    except ImportError:
-        st.warning("A biblioteca `fpdf2` não está instalada. O PDF gerado será um placeholder de texto.")
-        
-        pdf_content_str = f"RELATÓRIO EXECUTIVO OOH (Placeholder) \n\nInstale 'fpdf2' para o relatório com storytelling."
-        buffer = io.BytesIO()
-        buffer.write(pdf_content_str.encode('utf-8'))
-        return buffer.getvalue() 
-
-    except Exception as e:
-        st.error(f"Erro Crítico ao gerar PDF: {type(e).__name__}: {e}")
-        pdf_content_str = f"RELATÓRIO EXECUTIVO OOH (Erro Crítico) \n\nDetalhes: {type(e).__name__}: {e}"
-        return pdf_content_str.encode('utf-8') 
-
-# -------------------------------
-# Botão de Download PDF
-# -------------------------------
-pdf_bytes = create_pdf_report(df_relatorio)
-
-st.download_button(
-    label="Baixar Relatório em PDF",
-    data=pdf_bytes,
-    file_name='relatorio_executivo_storytelling.pdf',
-    mime='application/pdf',
-    type="primary",
-    help="Gera um relatório PDF detalhado com narrativa de dados e formatação condicional."
+            pdf.cell(col_widths[1], 7, f"R$ {row['Total_Investimento']:,.0f}", 1, 0, "R
