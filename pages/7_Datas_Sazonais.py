@@ -2,13 +2,19 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+# Importa a função de padronização
+from src.utils import set_page_config_and_style 
 
 # -------------------------------
-# CONFIGURAÇÕES GERAIS
+# CONFIGURAÇÕES GERAIS E ESTILO PADRÃO
 # -------------------------------
-st.set_page_config(page_title="Datas Sazonais", layout="wide")
-st.markdown("<h1 style='text-align: center; color: #1E90FF;'>Calendário Sazonal & Projeção</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; font-size: 18px;'>Comparação de fluxo OOH por ano – 2024 a 2028</p>", unsafe_allow_html=True)
+# REMOVIDAS AS LINHAS st.set_page_config, st.markdown (h1 e p)
+set_page_config_and_style(
+    page_title="Datas Sazonais",
+    main_title="CALENDÁRIO SAZONAL & PROJEÇÃO",
+    subtitle="Comparação de fluxo OOH por ano – 2024 a 2028"
+)
+# A função set_page_config_and_style já adiciona a linha horizontal (---)
 
 # -------------------------------
 # MAPEAMENTO DE EMOJIS (SEM NOME EM INGLÊS)
@@ -16,15 +22,15 @@ st.markdown("<p style='text-align: center; font-size: 18px;'>Comparação de flu
 EMOJIS = {
     "party-popper": "&#x1F389;",     # Ano Novo
     "mask": "&#x1F383;",            # Carnaval
-    "church": "&#x26EA;",           # Igreja
-    "flag": "&#x1F1E7;&#x1F1F7;",   # Bandeira BR
-    "briefcase": "&#x1F4BC;",       # Trabalho
-    "baby": "&#x1F476;",            # Criança
-    "candle": "&#x1F56F;",          # Vela
-    "scroll": "&#x1F4DC;",          # Pergaminho
-    "raised-fist": "&#x270A;",      # Punho
-    "christmas-tree": "&#x1F384;",  # Natal
-    "fireworks": "&#x1F386;",       # Réveillon
+    "church": "&#x26EA;",            # Igreja
+    "flag": "&#x1F1E7;&#x1F1F7;",  # Bandeira BR
+    "briefcase": "&#x1F4BC;",        # Trabalho
+    "baby": "&#x1F476;",             # Criança
+    "candle": "&#x1F56F;",           # Vela
+    "scroll": "&#x1F4DC;",           # Pergaminho
+    "raised-fist": "&#x270A;",       # Punho
+    "christmas-tree": "&#x1F384;",   # Natal
+    "fireworks": "&#x1F386;",        # Réveillon
 }
 
 # -------------------------------
@@ -93,7 +99,7 @@ CORES_ANO = {2024: "#1E90FF", 2025: "#32CD32", 2026: "#FF8C00", 2027: "#DC143C",
 CORES_NIVEL = {1: "#87CEEB", 2: "#FFD700", 3: "#FF8C00", 4: "#DC143C"}
 
 # -------------------------------
-# LAYOUT
+# LAYOUT (Mantido o excelente padrão de colunas)
 # -------------------------------
 col1, col2 = st.columns([1.3, 2.7])
 
@@ -126,7 +132,7 @@ with col1:
                 </div>
                 """, unsafe_allow_html=True)
 
-# === GRÁFICO, MÉTRICAS E TABELA (sem mudanças) ===
+# === GRÁFICO, MÉTRICAS E TABELA (sem mudanças no interior do col2) ===
 with col2:
     st.markdown("### Comparação de Impacto por Ano")
     fig = go.Figure()
@@ -162,6 +168,7 @@ with col2:
         projetado = int(base * fator)
         delta = f"+{int((fator-1)*100)}%"
         with cols[i]:
+            # Mantido o HTML customizado para as métricas, pois é um design bonito.
             st.markdown(f"""
             <div style="text-align:center; padding:15px; background:{CORES_ANO[ano]}; border-radius:12px; color:white;">
                 <h4 style="margin:0;">{ano}</h4>
@@ -184,12 +191,11 @@ with col2:
         st.info("Nenhum dado de Natal.")
 
 # DICAS
-st.markdown("---")
 st.success("""
-**Dica Estratégica**:  
-- 2024 → Foco em consolidação  
-- 2025 → Expansão (+15%)  
-- 2026 → Domínio (+32%)  
+**Dica Estratégica**: 
+- 2024 → Foco em consolidação 
+- 2025 → Expansão (+15%) 
+- 2026 → Domínio (+32%) 
 Planeje campanhas com 2 anos de antecedência!
 """)
 st.caption("Projeção com +15% anual (Artesp, CET-SP, tendência urbana SP)")
