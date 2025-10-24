@@ -3,11 +3,12 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import io
-from src.utils import set_page_config_and_style
+# Assumindo que src.utils existe. Se não existir, comente a linha abaixo
+from src.utils import set_page_config_and_style 
 from datetime import datetime
 import plotly.express as px 
 from PIL import Image 
-from fpdf import FPDF # Importado aqui para evitar NameError dentro da função
+from fpdf import FPDF # <-- Importado aqui para estabilidade de sintaxe!
 
 # -------------------------------
 # CONFIGURAÇÕES GERAIS E ESTILO PADRÃO
@@ -190,4 +191,31 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
             # Estilo Condicional para Investimento Alto
             if row['Total_Investimento'] == maior_investimento_mes['Total_Investimento']:
                 pdf.set_font("Arial", "B", 10)
-            pdf.cell(col_widths[1], 7, f"R$ {row['Total_Investimento']:,.0f}", 1, 0, "R
+            pdf.cell(col_widths[1], 7, f"R$ {row['Total_Investimento']:,.0f}", 1, 0, "R")
+            pdf.set_font("Arial", "", 10) # Reseta o negrito
+
+            pdf.cell(col_widths[2], 7, f"{row['Total_Reach']:.1f}", 1, 0, "R")
+            
+            # Estilo Condicional para CPM Alto
+            if row['Media_CPM'] > df_monthly['Media_CPM'].mean() * 1.1:
+                pdf.set_text_color(255, 0, 0) # Cor Vermelha
+            pdf.cell(col_widths[3], 7, f"R$ {row['Media_CPM']:.2f}", 1, 0, "R")
+            pdf.set_text_color(0, 0, 0) # Reseta a cor para preto
+            pdf.ln()
+
+        pdf.ln(10)
+        
+        # --- SEÇÃO 4: DETALHE COMPLETO DA CAMPANHA ---
+        pdf.set_font("Arial", "B", 14)
+        pdf.cell(200, 10, "4. Detalhe Completo por Campanha", 0, 1, "L")
+        
+        pdf.set_font("Arial", "I", 10)
+        pdf.cell(200, 5, "Listamos as 5 campanhas com maior investimento no período.", 0, 1, "L")
+        pdf.ln(2)
+
+        pdf.set_font("Arial", "B", 8)
+        col_widths_detalhe = [20, 15, 20, 20, 20, 20, 20, 20]
+        headers_detalhe = ["ID", "Mês", "Mídia", "Invest.(K)", "Reach(MM)", "Freq.", "CPM", "Audiência"]
+        
+        for col, width in zip(headers_detalhe, col_widths_detalhe):
+            pdf.cell(width, 7
