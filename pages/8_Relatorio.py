@@ -4,10 +4,9 @@ import pandas as pd
 import numpy as np
 import io
 from src.utils import set_page_config_and_style
-from datetime import datetime # <<< LINHA DE CORREÇÃO ADICIONADA AQUI
+from datetime import datetime # CORREÇÃO: Importa a classe datetime
 
-# Se você instalou o fpdf2, descomente a linha abaixo (e trate a importação da mesma forma):
-# from fpdf import FPDF 
+# OMITIDO: from fpdf import FPDF (Importação feita dentro do try/except para segurança)
 
 # -------------------------------
 # CONFIGURAÇÕES GERAIS E ESTILO PADRÃO
@@ -92,9 +91,12 @@ st.markdown("### 📄 Download em PDF (Relatório Visual)")
 def create_pdf_report(df: pd.DataFrame) -> bytes:
     """
     Função que simula a criação de um relatório PDF.
+    
+    NOTA: Para funcionar de fato, você precisa instalar a biblioteca fpdf2 (pip install fpdf2).
     """
     try:
-        from fpdf import FPDF # Importação Condicional
+        # Importação segura: só tenta gerar PDF se a biblioteca estiver instalada.
+        from fpdf import FPDF 
 
         pdf = FPDF()
         pdf.add_page()
@@ -102,7 +104,7 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
         pdf.cell(200, 10, "Relatório Executivo OOH", 0, 1, "C")
         
         pdf.set_font("Arial", "", 12)
-        # ESTA LINHA FOI CORRIGIDA (datetime.now)
+        # datetime.now() está seguro graças à importação no topo
         pdf.cell(200, 10, f"Data da Geração: {datetime.now().strftime('%Y-%m-%d %H:%M')}", 0, 1) 
         pdf.cell(200, 10, f"Total de Campanhas Analisadas: {len(df)}", 0, 1)
 
@@ -130,12 +132,19 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
             pdf.cell(col_widths[4], 7, f"R$ {row['CPM_R$']:.2f}", 1, 0)
             pdf.ln()
 
+        # RETORNO BEM SUCEDIDO
         return pdf.output(dest='S').encode('latin-1')
         
     except ImportError:
+        # Se a importação falhar, ele cai aqui, gerando o placeholder de texto com segurança.
+        
         st.warning("A biblioteca `fpdf2` não está instalada. O PDF gerado será um placeholder de texto.")
-        # Placeholder se o fpdf2 não estiver instalado
-        pdf_content = f"RELATÓRIO EXECUTIVO OOH (Placeholder) \n\nTotal de Campanhas: {num_campanhas}\nInvestimento: R$ {total_investimento:,.0f} mil\n\nInstale 'fpdf2' (pip install fpdf2) para gerar o PDF completo."
+        pdf_content = f"RELATÓRIO EXECUTIVO OOH (Placeholder) \n\nTotal de Campanhas: {len(df)}\nInvestimento: R$ {df['Investimento_Mil_R$'].sum():,.0f} mil\n\nInstale 'fpdf2' (pip install fpdf2) para gerar o PDF completo."
+        return pdf_content.encode('utf-8')
+    except Exception as e:
+        # Captura outros erros (ex: erro de fonte)
+        st.error(f"Erro ao gerar PDF (Instalado?): {e}")
+        pdf_content = f"RELATÓRIO EXECUTIVO OOH (Erro na Geração) \n\nDetalhes: {e}"
         return pdf_content.encode('utf-8')
 
 # -------------------------------
