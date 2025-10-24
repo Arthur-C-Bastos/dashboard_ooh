@@ -5,10 +5,11 @@ import numpy as np
 import io
 from src.utils import set_page_config_and_style
 from datetime import datetime
-import plotly.express as px # Adicionado para criar o gráfico
+import plotly.express as px
+from PIL import Image # Importado para manipulação, caso necessário, mas principalmente para clareza
 
 # -------------------------------
-# CONFIGURAÇÕES GERAIS E DADOS (Omitido por brevidade, sem alterações)
+# CONFIGURAÇÕES GERAIS E ESTILO PADRÃO
 # -------------------------------
 set_page_config_and_style(
     page_title="Relatório Executivo",
@@ -16,10 +17,12 @@ set_page_config_and_style(
     subtitle="Resumo das análises e opções de exportação de dados"
 )
 
-# ... (função get_mock_data e cálculos de métricas mantidos)
-
+# -------------------------------
+# DADOS MOCK (Simulando os dados de outras abas)
+# -------------------------------
 @st.cache_data
 def get_mock_data():
+    """Gera um DataFrame unificado para download, simulando dados de análise OOH."""
     data = {
         'ID_Campanha': [f'C{i}' for i in range(101, 111)],
         'Mes': ['Jan', 'Jan', 'Fev', 'Fev', 'Mar', 'Mar', 'Abr', 'Abr', 'Maio', 'Maio'],
@@ -44,7 +47,6 @@ num_campanhas = len(df_relatorio)
 def generate_chart_png(df):
     """Cria um gráfico Plotly e o retorna como bytes PNG."""
     df_agg = df.groupby('Mes')['Investimento_Mil_R$'].sum().reset_index()
-    # Ordem dos meses para o gráfico
     mes_order = ['Jan', 'Fev', 'Mar', 'Abr', 'Maio']
     df_agg['Mes'] = pd.Categorical(df_agg['Mes'], categories=mes_order, ordered=True)
     df_agg = df_agg.sort_values('Mes')
@@ -59,19 +61,20 @@ def generate_chart_png(df):
     )
     fig.update_layout(plot_bgcolor='white', margin=dict(t=50, b=0, l=0, r=0))
     
-    img_bytes = io.BytesIO()
-    
     try:
-        # Requer 'kaleido' para exportar
-        fig.write_image(img_bytes, format='png', width=700, height=400)
-        return img_bytes.getvalue()
+        # TENTA EXPORTAR DIRETAMENTE COMO BYTES PNG
+        # Requer 'kaleido' para a renderização limpa
+        img_bytes = fig.to_image(format="png", width=700, height=400)
+        
+        return img_bytes
+        
     except Exception as e:
-        # Retorna None ou uma imagem de placeholder se kaleido falhar
-        st.error(f"Erro ao exportar gráfico para PNG (Verifique a instalação de 'kaleido'): {e}")
+        # Se Plotly/Kaleido falhar (por falta de navegador ou outra razão)
+        st.error(f"Erro ao gerar imagem PNG do gráfico: {e}")
         return None
 
 # -------------------------------
-# 1. RESUMO EXECUTIVO NA TELA (MANTIDO)
+# 1. RESUMO EXECUTIVO NA TELA
 # -------------------------------
 st.markdown("### Resumo das Métricas Chave")
 col1, col2, col3, col4 = st.columns(4)
@@ -82,8 +85,7 @@ with col4: st.metric("CPM Médio", f"R$ {media_cpm:.2f}")
 
 st.markdown("---")
 
-# Visualização do gráfico no dashboard (para debug e visualização)
-st.markdown("### 📊 Visualização Gráfica do Relatório")
+# Visualização do gráfico no dashboard (opcional)
 if st.checkbox("Mostrar Gráfico de Investimento (Visão Dashboard)"):
     df_agg = df_relatorio.groupby('Mes')['Investimento_Mil_R$'].sum().reset_index()
     mes_order = ['Jan', 'Fev', 'Mar', 'Abr', 'Maio']
@@ -99,11 +101,10 @@ if st.checkbox("Mostrar Gráfico de Investimento (Visão Dashboard)"):
     st.plotly_chart(fig_dash, use_container_width=True)
 
 # -------------------------------
-# 2. DOWNLOAD CSV (MANTIDO)
+# 2. DOWNLOAD CSV
 # -------------------------------
-st.markdown("---")
 st.markdown("### 📥 Download em CSV")
-# ... (código download CSV)
+st.info("Baixe a planilha completa de desempenho das campanhas para análise detalhada em Excel ou outra ferramenta.")
 csv = df_relatorio.to_csv(index=False).encode('utf-8')
 st.download_button(
     label="Baixar Dados em CSV",
@@ -122,6 +123,7 @@ st.markdown("### 📄 Download em PDF (Relatório Visual Rico)")
 def create_pdf_report(df: pd.DataFrame) -> bytes:
     """
     Função que gera um relatório PDF rico com imagem.
+    Garante que o retorno seja sempre bytes para o Streamlit.
     """
     try:
         from fpdf import FPDF 
@@ -157,16 +159,15 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
             pdf.cell(200, 10, "Visualização de Investimento Mensal", 0, 1, "L")
             
             # Adiciona a imagem do buffer
-            # 'type' precisa ser 'png' ou 'jpeg'
             pdf.image(
                 name=io.BytesIO(chart_png_bytes), 
                 type='PNG', 
-                w=pdf.w - 20 # Largura total da página menos margens
+                w=pdf.w - 20 # Largura da página menos margens
             )
             pdf.ln(10)
         else:
             pdf.set_font("Arial", "I", 10)
-            pdf.cell(200, 5, "Gráfico não disponível (Kaleido não instalado/erro de exportação)", 0, 1, "C")
+            pdf.cell(200, 5, "Gráfico não disponível (Erro de Exportação)", 0, 1, "C")
             pdf.ln(5)
 
 
@@ -192,13 +193,14 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
             pdf.cell(col_widths[5], 7, f"R$ {row['CPM_R$']:.2f}", 1, 0, "R")
             pdf.ln()
 
-        # RETORNO BINÁRIO (garantido)
+        # RETORNO BINÁRIO (garantido via buffer)
         buffer = io.BytesIO(pdf.output(dest='S'))
         return buffer.getvalue() 
         
     except ImportError:
         # PLACEHOLDER: fpdf2 não instalado
         st.warning("A biblioteca `fpdf2` não está instalada. O PDF gerado será um placeholder de texto.")
+        
         pdf_content_str = f"RELATÓRIO EXECUTIVO OOH (Placeholder) \n\nInstale 'fpdf2' e 'kaleido' para o relatório visual rico."
         buffer = io.BytesIO()
         buffer.write(pdf_content_str.encode('utf-8'))
@@ -211,7 +213,7 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
         return pdf_content_str.encode('utf-8') 
 
 # -------------------------------
-# Botão de Download PDF (MANTIDO)
+# Botão de Download PDF
 # -------------------------------
 pdf_bytes = create_pdf_report(df_relatorio)
 
