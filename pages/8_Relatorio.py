@@ -1,14 +1,24 @@
 # pages/8_Relatorio.py
+# -*- coding: utf-8 -*- 
+# Adicionando a codificação UTF-8 para garantir a compatibilidade de caracteres
 import streamlit as st
 import pandas as pd
 import numpy as np
 import io
-# Assumindo que src.utils existe. Se não existir, comente a linha abaixo
-from src.utils import set_page_config_and_style 
+# Importe 'set_page_config_and_style' se o arquivo 'src/utils.py' existir.
+# Caso contrário, COMENTE a linha abaixo e descomente a linha do 'st.set_page_config'.
+try:
+    from src.utils import set_page_config_and_style
+except ImportError:
+    def set_page_config_and_style(page_title, main_title, subtitle):
+        st.set_page_config(layout="wide", page_title=page_title)
+        st.title(main_title)
+        st.markdown(f"**{subtitle}**")
+
 from datetime import datetime
 import plotly.express as px 
 from PIL import Image 
-from fpdf import FPDF # <-- Importado aqui para estabilidade de sintaxe!
+from fpdf import FPDF 
 
 # -------------------------------
 # CONFIGURAÇÕES GERAIS E ESTILO PADRÃO
@@ -218,4 +228,54 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
         headers_detalhe = ["ID", "Mês", "Mídia", "Invest.(K)", "Reach(MM)", "Freq.", "CPM", "Audiência"]
         
         for col, width in zip(headers_detalhe, col_widths_detalhe):
-            pdf.cell(width, 7
+            pdf.cell(width, 7, col, 1, 0, "C")
+        pdf.ln()
+
+        pdf.set_font("Arial", "", 7)
+        df_detail = df.sort_values(by='Investimento_Mil_R$', ascending=False).head(5)
+        
+        for _, row in df_detail.iterrows():
+            pdf.cell(col_widths_detalhe[0], 5, row['ID_Campanha'], 1, 0)
+            pdf.cell(col_widths_detalhe[1], 5, row['Mes'], 1, 0, "C")
+            pdf.cell(col_widths_detalhe[2], 5, row['Tipo_Midia'], 1, 0)
+            pdf.cell(col_widths_detalhe[3], 5, f"{row['Investimento_Mil_R$']:.1f}", 1, 0, "R")
+            pdf.cell(col_widths_detalhe[4], 5, f"{row['Reach_Milhoes']:.1f}", 1, 0, "R")
+            pdf.cell(col_widths_detalhe[5], 5, f"{row['Frequencia']:.1f}", 1, 0, "R")
+            pdf.cell(col_widths_detalhe[6], 5, f"{row['CPM_R$']:.2f}", 1, 0, "R")
+            pdf.cell(col_widths_detalhe[7], 5, f"{row['Audiencia_Pico_K']}", 1, 0, "R")
+            pdf.ln()
+
+
+        # RETORNO BINÁRIO
+        buffer = io.BytesIO(pdf.output(dest='S'))
+        return buffer.getvalue() 
+        
+    except ImportError:
+        # TRATAMENTO DE ERRO: fpdf2 não instalado
+        # Nota: Como FPDF foi importado no topo, este bloco só será acionado
+        # se o Streamlit falhar na execução ou a biblioteca não estiver instalada.
+        st.error("Erro: A biblioteca `fpdf` não foi encontrada. Certifique-se de que está instalada (pip install fpdf2).")
+        pdf_content_str = "ERRO: Instale 'fpdf2' para gerar o PDF."
+        buffer = io.BytesIO()
+        buffer.write(pdf_content_str.encode('utf-8'))
+        return buffer.getvalue() 
+
+    except Exception as e:
+        # TRATAMENTO DE OUTROS ERROS DE EXECUÇÃO
+        st.error(f"Erro Crítico ao gerar PDF: {type(e).__name__}: {e}")
+        pdf_content_str = f"ERRO CRÍTICO NA GERAÇÃO DO PDF: {type(e).__name__}: {e}"
+        return pdf_content_str.encode('utf-8') 
+
+# -------------------------------
+# Botão de Download PDF
+# -------------------------------
+pdf_bytes = create_pdf_report(df_relatorio)
+
+st.download_button(
+    label="Baixar Relatório em PDF",
+    data=pdf_bytes,
+    file_name='relatorio_executivo_storytelling.pdf',
+    mime='application/pdf',
+    type="primary",
+    help="Gera um relatório PDF detalhado com narrativa de dados e formatação condicional."
+)
