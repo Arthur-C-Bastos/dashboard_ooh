@@ -4,9 +4,7 @@ import pandas as pd
 import numpy as np
 import io
 from src.utils import set_page_config_and_style
-from datetime import datetime # CORREÇÃO: Importa a classe datetime
-
-# OMITIDO: from fpdf import FPDF (Importação feita dentro do try/except para segurança)
+from datetime import datetime # Importa a classe datetime
 
 # -------------------------------
 # CONFIGURAÇÕES GERAIS E ESTILO PADRÃO
@@ -90,21 +88,22 @@ st.markdown("### 📄 Download em PDF (Relatório Visual)")
 
 def create_pdf_report(df: pd.DataFrame) -> bytes:
     """
-    Função que simula a criação de um relatório PDF.
-    
-    NOTA: Para funcionar de fato, você precisa instalar a biblioteca fpdf2 (pip install fpdf2).
+    Função que gera um relatório PDF usando fpdf2, se instalado.
     """
     try:
-        # Importação segura: só tenta gerar PDF se a biblioteca estiver instalada.
         from fpdf import FPDF 
 
         pdf = FPDF()
         pdf.add_page()
-        pdf.set_font("Arial", "B", 16)
+        
+        # NOTE: Para acentos e caracteres especiais, você pode precisar de uma fonte TrueType:
+        # pdf.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
+        # pdf.set_font("DejaVu", "", 16)
+        pdf.set_font("Arial", "B", 16) 
+        
         pdf.cell(200, 10, "Relatório Executivo OOH", 0, 1, "C")
         
         pdf.set_font("Arial", "", 12)
-        # datetime.now() está seguro graças à importação no topo
         pdf.cell(200, 10, f"Data da Geração: {datetime.now().strftime('%Y-%m-%d %H:%M')}", 0, 1) 
         pdf.cell(200, 10, f"Total de Campanhas Analisadas: {len(df)}", 0, 1)
 
@@ -132,8 +131,8 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
             pdf.cell(col_widths[4], 7, f"R$ {row['CPM_R$']:.2f}", 1, 0)
             pdf.ln()
 
-        # RETORNO BEM SUCEDIDO
-        return pdf.output(dest='S').encode('latin-1')
+        # CORREÇÃO AQUI: Removemos o .encode(), pois pdf.output(dest='S') já retorna bytes/bytearray
+        return pdf.output(dest='S')
         
     except ImportError:
         # Se a importação falhar, ele cai aqui, gerando o placeholder de texto com segurança.
@@ -142,7 +141,7 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
         pdf_content = f"RELATÓRIO EXECUTIVO OOH (Placeholder) \n\nTotal de Campanhas: {len(df)}\nInvestimento: R$ {df['Investimento_Mil_R$'].sum():,.0f} mil\n\nInstale 'fpdf2' (pip install fpdf2) para gerar o PDF completo."
         return pdf_content.encode('utf-8')
     except Exception as e:
-        # Captura outros erros (ex: erro de fonte)
+        # Captura outros erros
         st.error(f"Erro ao gerar PDF (Instalado?): {e}")
         pdf_content = f"RELATÓRIO EXECUTIVO OOH (Erro na Geração) \n\nDetalhes: {e}"
         return pdf_content.encode('utf-8')
