@@ -4,7 +4,9 @@ import pandas as pd
 import numpy as np
 import io
 from src.utils import set_page_config_and_style
-# Se você instalar o fpdf2, descomente a linha abaixo:
+from datetime import datetime # <<< LINHA DE CORREÇÃO ADICIONADA AQUI
+
+# Se você instalou o fpdf2, descomente a linha abaixo (e trate a importação da mesma forma):
 # from fpdf import FPDF 
 
 # -------------------------------
@@ -90,9 +92,6 @@ st.markdown("### 📄 Download em PDF (Relatório Visual)")
 def create_pdf_report(df: pd.DataFrame) -> bytes:
     """
     Função que simula a criação de um relatório PDF.
-    
-    NOTA: Para que isso funcione, você precisa instalar a biblioteca fpdf2 (pip install fpdf2).
-    Se você não instalou, esta função será apenas um PLACEHOLDER.
     """
     try:
         from fpdf import FPDF # Importação Condicional
@@ -103,7 +102,8 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
         pdf.cell(200, 10, "Relatório Executivo OOH", 0, 1, "C")
         
         pdf.set_font("Arial", "", 12)
-        pdf.cell(200, 10, f"Data da Geração: {datetime.now().strftime('%Y-%m-%d %H:%M')}", 0, 1)
+        # ESTA LINHA FOI CORRIGIDA (datetime.now)
+        pdf.cell(200, 10, f"Data da Geração: {datetime.now().strftime('%Y-%m-%d %H:%M')}", 0, 1) 
         pdf.cell(200, 10, f"Total de Campanhas Analisadas: {len(df)}", 0, 1)
 
         # Adicionar Métrica Principal
@@ -135,7 +135,7 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
     except ImportError:
         st.warning("A biblioteca `fpdf2` não está instalada. O PDF gerado será um placeholder de texto.")
         # Placeholder se o fpdf2 não estiver instalado
-        pdf_content = f"RELATÓRIO EXECUTIVO OOH (Placeholder) \n\nTotal de Campanhas: {num_campanhas}\nInvestimento: R$ {total_investimento:,.0f} mil\n\nInstale 'fpdf2' para gerar o PDF completo."
+        pdf_content = f"RELATÓRIO EXECUTIVO OOH (Placeholder) \n\nTotal de Campanhas: {num_campanhas}\nInvestimento: R$ {total_investimento:,.0f} mil\n\nInstale 'fpdf2' (pip install fpdf2) para gerar o PDF completo."
         return pdf_content.encode('utf-8')
 
 # -------------------------------
