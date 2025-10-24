@@ -15,6 +15,8 @@ set_page_config_and_style(
     subtitle="Resumo das análises e opções de exportação de dados"
 )
 
+# ... (função get_mock_data e cálculos de métricas mantidos)
+
 @st.cache_data
 def get_mock_data():
     data = {
@@ -35,7 +37,7 @@ media_cpm = df_relatorio['CPM_R$'].mean()
 total_reach = df_relatorio['Reach_Milhoes'].sum().round(1)
 num_campanhas = len(df_relatorio)
 
-# ... (Seção 1 e 2 omitidas)
+# ... (Seções de Resumo e Download CSV mantidas)
 
 st.markdown("### Resumo das Métricas Chave")
 col1, col2, col3, col4 = st.columns(4)
@@ -68,8 +70,7 @@ st.markdown("### 📄 Download em PDF (Relatório Visual)")
 
 def create_pdf_report(df: pd.DataFrame) -> bytes:
     """
-    Função que gera um relatório PDF usando fpdf2, se instalado.
-    Garante que o retorno seja sempre bytes para o download_button.
+    Função que gera um relatório PDF. Usa io.BytesIO para garantir retorno binário.
     """
     try:
         from fpdf import FPDF 
@@ -103,8 +104,11 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
             pdf.cell(col_widths[4], 7, f"R$ {row['CPM_R$']:.2f}", 1, 0)
             pdf.ln()
 
-        # RETORNO BINÁRIO PURO (PDF gerado)
-        return pdf.output(dest='S')
+        # ALTERAÇÃO CHAVE: Usar io.BytesIO para garantir a tipagem 'bytes'
+        pdf_output = pdf.output(dest='S')
+        buffer = io.BytesIO(pdf_output)
+        
+        return buffer.getvalue() 
         
     except ImportError:
         # PLACEHOLDER: Retorno binário forçado para o placeholder
@@ -119,8 +123,8 @@ def create_pdf_report(df: pd.DataFrame) -> bytes:
 
     except Exception as e:
         # TRATAMENTO DE OUTROS ERROS: Retorna bytes com a mensagem de erro
-        st.error(f"Erro ao gerar PDF (Instalado?): {e}")
-        pdf_content_str = f"RELATÓRIO EXECUTIVO OOH (Erro na Geração) \n\nDetalhes: {e}"
+        st.error(f"Erro ao gerar PDF: {type(e).__name__}: {e}")
+        pdf_content_str = f"RELATÓRIO EXECUTIVO OOH (Erro na Geração) \n\nDetalhes: {type(e).__name__}: {e}"
         
         # Converte a string de erro para bytes antes de retornar
         return pdf_content_str.encode('utf-8') 
