@@ -1,5 +1,6 @@
+# app.py (ou sua página inicial)
 import streamlit as st
-import pandas as pd
+import pandas as pd # <--- ADICIONE ESTA LINHA AQUI!
 
 st.set_page_config(
     page_title="OOH Dashboard BR",
@@ -11,8 +12,7 @@ st.title("📊 OOH Dashboard BR – Plataforma de Análise Tática e Sazonal")
 
 st.markdown("""
 Bem-vindo à **Versão Didática** do seu painel de Out-Of-Home (OOH) para o mercado brasileiro.
-
-Este aplicativo foi arquitetado para transformar dados geográficos e contextuais em **inteligência de mídia**, otimizando a seleção de locais e a estratégia de investimento. Navegue pelas seções para explorar diferentes dimensões da análise OOH:
+... (resto do seu texto)
 """)
 
 # Simula uma tabela formatada em Streamlit para melhor visualização
@@ -28,11 +28,8 @@ data = {
     ]
 }
 
-df_nav = pd.DataFrame(data)
-
-# st.table é simples, st.dataframe é mais interativo, mas um markdown formatado pode ser mais estético
-# st.dataframe(df_nav, hide_index=True)
+# LINHA CORRIGIDA
+df_nav = pd.DataFrame(data) 
 
 st.markdown("---")
 st.header("Selecione uma aba no menu lateral para começar sua análise.")
-
