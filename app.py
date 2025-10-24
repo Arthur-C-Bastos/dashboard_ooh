@@ -1,14 +1,36 @@
 import streamlit as st
 
+st.set_page_config(
+    page_title="OOH Dashboard BR",
+    layout="wide"
+)
 
-st.set_page_config(page_title='OOH Dashboard BR', layout = 'wide')
-st.title('OHH Dashboard BR - Versão didática')
-st.markdown('''
-Este é um app didático que organiza várias páginas (abas) para análise OOH no Brasil.
-Navegue pelas abas e conheça o projeto.
-''')
+# Versão 1: Profissional e Focado em Valor
+st.title("📊 OOH Dashboard BR – Plataforma de Análise Tática e Sazonal")
 
-st.sidebar.header('Sobre')
-st.sidebar.info('Projeto educacional')
+st.markdown("""
+Bem-vindo à **Versão Didática** do seu painel de Out-Of-Home (OOH) para o mercado brasileiro.
 
-st.markdown('''Selecione uma aba para começar: Mapa Interativo, Indicadores, Mobilidade, Clima, Análise e Configurações. ''')
+Este aplicativo foi arquitetado para transformar dados geográficos e contextuais em **inteligência de mídia**, otimizando a seleção de locais e a estratégia de investimento. Navegue pelas seções para explorar diferentes dimensões da análise OOH:
+""")
+
+# Simula uma tabela formatada em Streamlit para melhor visualização
+data = {
+    'Seção': ['🗺️ Mapa Interativo', '📈 Indicadores', '🚗 Mobilidade', '🌤️ Clima', '🔍 Análise', '⚙️ Configurações'],
+    'Foco Principal': [
+        'Visualize a densidade de mídias e o entorno de Pontos de Interesse (POIs).',
+        'Acompanhe métricas chave de performance e investimento em OOH.',
+        'Analise dados de tráfego, fluxo de pessoas e audiência de rotas.',
+        'Entenda a influência de fatores climáticos na exposição de suas mídias.',
+        'Gere relatórios consolidados e projeções de performance sazonal.',
+        'Defina o período de análise e personalize os parâmetros do projeto.'
+    ]
+}
+
+df_nav = pd.DataFrame(data)
+
+# st.table é simples, st.dataframe é mais interativo, mas um markdown formatado pode ser mais estético
+# st.dataframe(df_nav, hide_index=True)
+
+st.markdown("---")
+st.header("Selecione uma aba no menu lateral para começar sua análise.")
